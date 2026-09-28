@@ -170,6 +170,7 @@ try
                     "https://routeboard-online.netlify.app",
                     "https://routeboard.online",
                     "https://routeboard.online.com",
+                    "https://staging.routeboard.online",
                     "https://www.routeboars.com")
                   .AllowAnyMethod()
                   .AllowAnyHeader();
