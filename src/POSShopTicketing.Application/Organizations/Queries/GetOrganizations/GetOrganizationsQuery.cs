@@ -42,14 +42,14 @@ public class GetOrganizationsQueryHandler : IRequestHandler<GetOrganizationsQuer
                 EF.Functions.Like(o.Name, $"%{term}%"));
         }
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        //var totalCount = await query.CountAsync(cancellationToken);
 
-        if (totalCount == 0)
-        {
-            throw new NotFoundException(
-                nameof(Organization),
-                request.SearchTerm ?? "Search Criteria");
-        }
+        //if (totalCount == 0)
+        //{
+        //    throw new NotFoundException(
+        //        nameof(Organization),
+        //        request.SearchTerm ?? "Search Criteria");
+        //}
 
         var paged = await PaginatedList<Organization>
             .CreateAsync(query, request.PageNumber, request.PageSize);

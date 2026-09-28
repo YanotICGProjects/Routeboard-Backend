@@ -168,6 +168,8 @@ try
                     "https://routeboars.com",
                     "http://localhost:4200",
                     "https://routeboard-online.netlify.app",
+                    "https://routeboard.online",
+                    "https://routeboard.online.com",
                     "https://www.routeboars.com")
                   .AllowAnyMethod()
                   .AllowAnyHeader();
@@ -189,7 +191,15 @@ try
     //if (app.Environment.IsDevelopment())
     //{
         app.UseSwagger();
-        app.UseSwaggerUI(options => options.SwaggerEndpoint("/swagger/v1/swagger.json", "POSShopTicketing API v1"));
+    
+    app.UseSwaggerUI(options =>
+    {
+        options.RoutePrefix = "swagger";
+        options.SwaggerEndpoint(
+            "/swagger/v1/swagger.json",
+            "POSShopTicketing API v1");
+    });
+
    // }
 
     app.UseHttpsRedirection();

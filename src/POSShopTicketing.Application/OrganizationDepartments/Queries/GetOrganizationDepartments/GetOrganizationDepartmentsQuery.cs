@@ -33,7 +33,7 @@ public class GetOrganizationTeamsQueryHandler
         if (!teams.Any())
         {
             throw new NotFoundException(
-                nameof(OrganizationDepartment),
+                nameof(Organization),
                 request.OrganizationId);
         }
 

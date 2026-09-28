@@ -49,15 +49,15 @@ public class GetOrganizationContactsQueryHandler : IRequestHandler<GetOrganizati
                 EF.Functions.Like(m.Email, $"%{term}%"));
         }
 
-        // Throw NotFoundException when no records match
-        var exists = await query.AnyAsync(cancellationToken);
+        //// Throw NotFoundException when no records match
+        //var exists = await query.AnyAsync(cancellationToken);
 
-        if (!exists)
-        {
-            throw new NotFoundException(
-                nameof(OrganizationContact),
-                request.SearchTerm ?? request.OrganizationId?.ToString() ?? "Search Criteria");
-        }
+        //if (!exists)
+        //{
+        //    throw new NotFoundException(
+        //        nameof(OrganizationContact),
+        //        request.SearchTerm ?? request.OrganizationId?.ToString() ?? "Search Criteria");
+        //}
 
         var paged = await PaginatedList<OrganizationContact>
             .CreateAsync(query, request.PageNumber, request.PageSize);

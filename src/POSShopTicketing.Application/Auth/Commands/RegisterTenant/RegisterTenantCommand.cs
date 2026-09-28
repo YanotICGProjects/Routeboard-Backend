@@ -161,7 +161,7 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
             var (plainTextToken, tokenHash, _) = _tokenService.GenerateToken();
 
            
-                plainTextToken = "3333";
+                
                 tokenHash = ComputeHash(plainTextToken);
             
             

@@ -96,7 +96,7 @@ public class InviteTeamMemberCommandHandler : IRequestHandler<InviteTeamMemberCo
 
         var (plainTextToken, tokenHash, _) = _tokenService.GenerateToken();
 
-        plainTextToken = "3333";
+        
         tokenHash = ComputeHash(plainTextToken);
 
         var expiresAt = _dateTime.Now.AddDays(7);
