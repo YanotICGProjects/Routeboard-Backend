@@ -211,7 +211,7 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
             new TeamMemberLoggedInEvent(tenant.Id, owner.Id, owner.Email, owner.FullName, owner.Role.ToString()),
             cancellationToken);
 
-       // await SendInviteEmailAsync(owner, tenant.Name, plainTextToken, expiresAt, cancellationToken);
+        
 
         return result;
     }
@@ -231,44 +231,69 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
         var encodedToken = WebUtility.HtmlEncode(plainTextToken);
 
         var bodyHtml = string.IsNullOrEmpty(acceptUrl)
-    ? $"<p>{WebUtility.HtmlEncode(inviterLabel)} invited you to join <strong>{encodedTenantName}</strong> on RouteBoard as <strong>{teamMember.Role}</strong>.</p>" +
-      $"<p>Unfortunately, the invitation link is currently unavailable.</p>" +
-      $"<p>Please contact your administrator for a new invitation.</p>" +
-      $"<p>This invitation expires <strong>{expiresAt:yyyy-MM-dd HH:mm} UTC</strong>.</p>"
-    : $"<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#333333;\">" +
+    ? $@"
+<p>{WebUtility.HtmlEncode(inviterLabel)} invited you to join <strong>{encodedTenantName}</strong> on RouteBoard as <strong>{teamMember.Role}</strong>.</p>
+<p>Unfortunately, the invitation link is currently unavailable.</p>
+<p>Please contact your administrator for a new invitation.</p>
+<p>This invitation expires <strong>{expiresAt:yyyy-MM-dd HH:mm} UTC</strong>.</p>"
+    : $@"
+<div style=""font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#333333;"">
 
-      $"<p>{WebUtility.HtmlEncode(inviterLabel)} invited you to join <strong>{encodedTenantName}</strong> on RouteBoard as <strong>{teamMember.Role}</strong>.</p>" +
+    <p>
+        {WebUtility.HtmlEncode(inviterLabel)} invited you to join
+        <strong>{encodedTenantName}</strong>
+        on RouteBoard as
+        <strong>{teamMember.Role}</strong>.
+    </p>
 
-      $"<p>Click the button below to accept your invitation and complete your account setup.</p>" +
+    <p>
+        Click the button below to accept your invitation and complete your account setup.
+    </p>
 
-      $"<p style=\"margin:30px 0;\">" +
-      $"<a href=\"{acceptUrl}\" target=\"_blank\" " +
-      $"style=\"background-color:#2563eb;" +
-      $"color:#ffffff;" +
-      $"padding:12px 24px;" +
-      $"text-decoration:none;" +
-      $"border-radius:6px;" +
-      $"display:inline-block;" +
-      $"font-weight:bold;" +
-      $"font-family:Arial,sans-serif;\">" +
-      $"Accept Invitation" +
-      $"</a>" +
-      $"</p>" +
+    <p style=""margin:30px 0;"">
+        <a href=""{acceptUrl}""
+           target=""_blank""
+           style=""
+               background-color:#2563eb;
+               color:#ffffff;
+               padding:12px 24px;
+               text-decoration:none;
+               border-radius:6px;
+               display:inline-block;
+               font-weight:bold;
+               font-family:Arial,sans-serif;
+           "">
+            Accept Invitation
+        </a>
+    </p>
 
-      $"<p>If the button does not work, use the invitation link below:</p>" +
+    <p>
+        If the button does not work, use the invitation link below:
+    </p>
 
-      $"<p style=\"word-break:break-all;\">" +
-      $"<a href=\"{acceptUrl}\" " +
-      $"target=\"_blank\" " +
-      $"rel=\"noopener be used. " +
-      $"If this invitation expires before you accept it, please contact your administrator to request a new invitation." +
-      $"</p>" +
+    <p style=""word-break:break-all;margin:10px 0;"">
+        <a href=""{acceptUrl}""
+           target=""_blank""
+           rel=""noopener noreferrer""
+           style=""color:#2563eb;text-decoration:underline;"">
+            {acceptUrl}
+        </a>
+    </p>
 
-      $"<p style=\"color:#666666;font-size:12px;\">" +
-      $"If you were not expecting this invitation, you can safely ignore this email." +
-      $"</p>" +
+    <p>
+        This invitation expires
+        <strong>{expiresAt:yyyy-MM-dd HH:mm} UTC</strong>.
+    </p>
 
-      $"</div>";
+    <p>
+        If this invitation expires before you accept it, please contact your administrator to request a new invitation.
+    </p>
+
+    <p style=""color:#666666;font-size:12px;"">
+        If you were not expecting this invitation, you can safely ignore this email.
+    </p>
+
+</div>";
 
         await _emailSender.SendAsync(
             teamMember.Email, teamMember.FullName,

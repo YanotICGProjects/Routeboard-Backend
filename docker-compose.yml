@@ -45,10 +45,10 @@ services:
       # "Outbound email"). Fill them in once you have real SMTP
       # credentials from whichever provider you're using.
       Smtp__Host: ${SMTP_HOST:-}
-      Smtp__Port: ${SMTP_PORT:-587}
+      Smtp__Port: ${SMTP_PORT:-465}
       Smtp__Username: ${SMTP_USERNAME:-}
       Smtp__Password: ${SMTP_PASSWORD:-}
-      Smtp__UseStartTls: ${SMTP_USE_START_TLS:-true}
+      Smtp__UseStartTls: ${SMTP_USE_START_TLS:-false}
       Smtp__FromAddress: ${SMTP_FROM_ADDRESS:-}
       Smtp__FromName: ${SMTP_FROM_NAME:-POSShopTicketing}
       AuditEmail__Enabled: ${AUDIT_EMAIL_ENABLED:-true}
@@ -57,7 +57,7 @@ services:
       # the host without needing `docker compose exec`/`docker logs`.
       - ./logs:/app/logs
     ports:
-      - "127.0.0.1:5000:8080"
+      - "127.0.0.1:5000:5000"
 
 volumes:
   postgres-data:
