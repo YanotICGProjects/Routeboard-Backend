@@ -98,10 +98,18 @@ public class OrganizationsController : ApiControllerBase
     // ---- Organization Teams -------------------------------------------
 
     [HttpGet("{id:guid}/departments")]
-    public async Task<ActionResult<ApiResponse<List<OrganizationDepartmentDto>>>> GetDepartments(Guid id)
+    public async Task<ActionResult<PaginatedResponse<OrganizationDepartmentDto>>> GetDepartments(
+    Guid id,
+    [FromQuery] int pageNumber = 1,
+    [FromQuery] int pageSize = 20)
     {
-        var result = await Mediator.Send(new GetOrganizationDepartmentsQuery(id));
-        return Ok(ApiResponse<List<OrganizationDepartmentDto>>.Success(result));
+        var result = await Mediator.Send(
+            new GetOrganizationDepartmentsQuery(
+                id,
+                pageNumber,
+                pageSize));
+
+        return Ok(result);
     }
 
     [Authorize(Roles = "Owner,Admin")]

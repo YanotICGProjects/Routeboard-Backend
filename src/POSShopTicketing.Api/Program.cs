@@ -165,13 +165,12 @@ try
         options.AddPolicy("Default", policy =>
         {
             policy.WithOrigins(
-                    "https://routeboars.com",
+                    
                     "http://localhost:4200",
-                    "https://routeboard-online.netlify.app",
+                    
                     "https://routeboard.online",
-                    "https://routeboard.online.com",
-                    "https://staging.routeboard.online",
-                    "https://www.routeboars.com")
+                    
+                    "https://staging.routeboard.online")
                   .AllowAnyMethod()
                   .AllowAnyHeader();
         });

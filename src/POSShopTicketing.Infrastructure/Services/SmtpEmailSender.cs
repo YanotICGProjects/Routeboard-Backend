@@ -69,7 +69,7 @@ public class SmtpEmailSender : IEmailSender
 
             await client.ConnectAsync(
                 _settings.Host, _settings.Port,
-                _settings.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto,
+                _settings.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.SslOnConnect,
                 cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(_settings.Username))
