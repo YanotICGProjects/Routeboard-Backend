@@ -28,6 +28,19 @@ public class GetOrganizationContactsQueryHandler : IRequestHandler<GetOrganizati
         GetOrganizationContactsQuery request,
         CancellationToken cancellationToken)
     {
+        var organizationExists = await _context.Organizations
+            .AsNoTracking()
+            .AnyAsync(
+            o => o.Id == request.OrganizationId,
+            cancellationToken);
+
+        if (!organizationExists)
+        {
+            throw new NotFoundException(
+            nameof(Organization),
+            request.OrganizationId);
+        }
+
         var query = _context.OrganizationContacts
             .Include(m => m.Organization)
             .Include(m => m.OrganizationDepartment)
@@ -48,16 +61,6 @@ public class GetOrganizationContactsQueryHandler : IRequestHandler<GetOrganizati
                 EF.Functions.Like(m.LastName, $"%{term}%") ||
                 EF.Functions.Like(m.Email, $"%{term}%"));
         }
-
-        //// Throw NotFoundException when no records match
-        //var exists = await query.AnyAsync(cancellationToken);
-
-        //if (!exists)
-        //{
-        //    throw new NotFoundException(
-        //        nameof(OrganizationContact),
-        //        request.SearchTerm ?? request.OrganizationId?.ToString() ?? "Search Criteria");
-        //}
 
         var paged = await PaginatedList<OrganizationContact>
             .CreateAsync(query, request.PageNumber, request.PageSize);

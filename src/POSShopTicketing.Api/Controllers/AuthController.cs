@@ -6,6 +6,7 @@ using POSShopTicketing.Application.Auth.Commands.Login;
 using POSShopTicketing.Application.Auth.Commands.Logout;
 using POSShopTicketing.Application.Auth.Commands.RefreshToken;
 using POSShopTicketing.Application.Auth.Commands.RegisterTenant;
+using POSShopTicketing.Application.Auth.Commands.ResendInvite;
 using POSShopTicketing.Application.Common.Models;
 using POSShopTicketing.Shared.Wrappers;
 
@@ -65,6 +66,18 @@ public class AuthController : ApiControllerBase
         return Ok(ApiResponse<InviteTeamMemberResult>.Success(result, "Invitation sent."));
     }
 
+    [HttpPost("invite/{teamMemberId:guid}/resend")]
+    public async Task<IActionResult> ResendInvite(Guid teamMemberId)
+    {
+        await Mediator.Send(new ResendInviteCommand(teamMemberId));
+
+        return Ok(new
+        {
+            succeeded = true,
+            message = "Invitation resent successfully."
+        });
+    }
+
     [AllowAnonymous]
     [HttpPost("invite/accept")]
     public async Task<ActionResult<ApiResponse<AuthResultDto>>> AcceptInvite(AcceptInviteCommand command)
@@ -72,4 +85,5 @@ public class AuthController : ApiControllerBase
         var result = await Mediator.Send(command);
         return Ok(ApiResponse<AuthResultDto>.Success(result, "Invitation accepted."));
     }
+
 }

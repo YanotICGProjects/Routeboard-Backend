@@ -31,7 +31,7 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_URLS: http://+:5000
       ConnectionStrings__DefaultConnection: >-
         Host=postgres;Port=5432;Database=posshopticketing;
         Username=posshopticketing;Password=${POSTGRES_PASSWORD:-change-me-in-production}
