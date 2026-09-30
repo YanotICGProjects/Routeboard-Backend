@@ -28,18 +28,7 @@ public class GetOrganizationContactsQueryHandler : IRequestHandler<GetOrganizati
         GetOrganizationContactsQuery request,
         CancellationToken cancellationToken)
     {
-        var organizationExists = await _context.Organizations
-            .AsNoTracking()
-            .AnyAsync(
-            o => o.Id == request.OrganizationId,
-            cancellationToken);
-
-        if (!organizationExists)
-        {
-            throw new NotFoundException(
-            nameof(Organization),
-            request.OrganizationId);
-        }
+        
 
         var query = _context.OrganizationContacts
             .Include(m => m.Organization)
@@ -48,10 +37,7 @@ public class GetOrganizationContactsQueryHandler : IRequestHandler<GetOrganizati
             .OrderBy(m => m.LastName)
             .AsQueryable();
 
-        if (request.OrganizationId.HasValue)
-        {
-            query = query.Where(m => m.OrganizationId == request.OrganizationId.Value);
-        }
+       
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
@@ -62,12 +48,33 @@ public class GetOrganizationContactsQueryHandler : IRequestHandler<GetOrganizati
                 EF.Functions.Like(m.Email, $"%{term}%"));
         }
 
+
+
         var paged = await PaginatedList<OrganizationContact>
             .CreateAsync(query, request.PageNumber, request.PageSize);
 
         var dtos = paged.Items
             .Select(OrganizationContactDto.FromEntity)
             .ToList();
+
+        if (request.OrganizationId.HasValue)
+        {
+            var organizationExists = await _context.Organizations
+                .AsNoTracking()
+                .AnyAsync(
+                    o => o.Id == request.OrganizationId.Value,
+                    cancellationToken);
+
+            if (!organizationExists)
+            {
+                throw new NotFoundException(
+                    nameof(Organization),
+                    request.OrganizationId.Value);
+            }
+
+            query = query.Where(
+                m => m.OrganizationId == request.OrganizationId.Value);
+        }
 
         return new PaginatedList<OrganizationContactDto>(
             dtos,
