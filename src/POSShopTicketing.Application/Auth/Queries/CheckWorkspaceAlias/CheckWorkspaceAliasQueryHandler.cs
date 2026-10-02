@@ -10,7 +10,7 @@ public class CheckWorkspaceAliasQueryHandler
         bool>
 {
     private const string Domain =
-        "workspace.routeboard.online";
+        "support.routeboard.online";
 
     private readonly IApplicationDbContext _context;
 

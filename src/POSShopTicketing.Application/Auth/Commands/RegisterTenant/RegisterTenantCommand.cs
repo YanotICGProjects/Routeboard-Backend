@@ -84,7 +84,7 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
 
     public async Task<AuthResultDto> Handle(RegisterTenantCommand request, CancellationToken cancellationToken)
     {
-        var workspaceEmail = $"{request.WorkspaceAlias}@workspace.routeboard.online";
+        var workspaceEmail = $"{request.WorkspaceAlias}@support.routeboard.online";
 
         var exists = await _context.Tenants
         .AnyAsync(
@@ -94,7 +94,7 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
         if (exists)
         {
             throw new DomainException(
-                "Workspace alias already exists.");
+                "Support Workspace alias already exists.");
         }
 
         var normalizedEmail = request.OwnerEmail.Trim().ToLowerInvariant();
