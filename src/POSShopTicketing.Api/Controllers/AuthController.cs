@@ -1,12 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using POSShopTicketing.Application.Auth.Commands.AcceptInvite;
+using POSShopTicketing.Application.Auth.Commands.ConfirmEmailOtp;
 using POSShopTicketing.Application.Auth.Commands.InviteTeamMember;
 using POSShopTicketing.Application.Auth.Commands.Login;
 using POSShopTicketing.Application.Auth.Commands.Logout;
 using POSShopTicketing.Application.Auth.Commands.RefreshToken;
 using POSShopTicketing.Application.Auth.Commands.RegisterTenant;
 using POSShopTicketing.Application.Auth.Commands.ResendInvite;
+using POSShopTicketing.Application.Auth.Commands.VerifyEmailWithOtp;
+using POSShopTicketing.Application.Auth.Queries.CheckWorkspaceAlias;
 using POSShopTicketing.Application.Common.Models;
 using POSShopTicketing.Shared.Wrappers;
 
@@ -26,6 +29,41 @@ public class AuthController : ApiControllerBase
     {
         var result = await Mediator.Send(command);
         return Ok(ApiResponse<AuthResultDto>.Success(result, "Tenant created."));
+    }
+
+    [AllowAnonymous]
+    [HttpPost("verifyEmailWithOtp")]
+    public async Task<IActionResult>
+    VerifyEmailWithOtp(VerifyEmailWithOtpCommand command)
+    {
+        await Mediator.Send(command);
+
+        return Ok(ApiResponse<string>.Success("OTP Sent","Verification code sent."));
+    }
+
+    [AllowAnonymous]
+    [HttpPost("confirmEmailOtp")]
+    public async Task<IActionResult>
+    ConfirmEmailOtp(ConfirmEmailOtpCommand command)
+    {
+        var token = await Mediator.Send(command);
+
+        return Ok(ApiResponse<string>.Success(token,"Email verified."));
+    }
+
+    [AllowAnonymous]
+    [HttpGet("workspace-alias-available")]
+    public async Task<IActionResult>
+    WorkspaceAliasAvailable(string alias)
+    {
+        var available =
+            await Mediator.Send(
+                new CheckWorkspaceAliasQuery(
+                    alias));
+
+        return Ok(
+            ApiResponse<bool>.Success(
+                available));
     }
 
     [AllowAnonymous]

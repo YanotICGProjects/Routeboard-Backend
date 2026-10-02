@@ -25,6 +25,7 @@ public interface IApplicationDbContext
     DbSet<Notification> Notifications { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<SlaPolicy> SlaPolicies { get; }
+    DbSet<EmailVerificationOtp> EmailVerificationOtps { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

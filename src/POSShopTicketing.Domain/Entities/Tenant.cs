@@ -26,6 +26,9 @@ public class Tenant : BaseAuditableEntity
     public TenantPlan Plan { get; set; } = TenantPlan.Trial;
 
     public TenantStatus Status { get; set; } = TenantStatus.Active;
+    public string WorkspaceAlias { get; set; } = string.Empty;
+
+    public string SupportEmail { get; set; } = string.Empty;
 
     public ICollection<TeamMember> TeamMembers { get; set; } = new List<TeamMember>();
     public ICollection<Organization> Organizations { get; set; } = new List<Organization>();

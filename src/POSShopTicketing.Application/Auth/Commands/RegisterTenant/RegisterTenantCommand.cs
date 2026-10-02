@@ -31,6 +31,9 @@ public record RegisterTenantCommand : IRequest<AuthResultDto>
     public string OwnerFirstName { get; init; } = string.Empty;
     public string OwnerLastName { get; init; } = string.Empty;
     public string Slug { get; init; } = string.Empty;
+    public string WorkspaceAlias { get; init; } = string.Empty;
+
+    public string VerificationToken { get; init; } = string.Empty;
     public List<SignupInviteDto> Invites { get; init; } = new();
 }
 
@@ -81,6 +84,19 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
 
     public async Task<AuthResultDto> Handle(RegisterTenantCommand request, CancellationToken cancellationToken)
     {
+        var workspaceEmail = $"{request.WorkspaceAlias}@workspace.routeboard.online";
+
+        var exists = await _context.Tenants
+        .AnyAsync(
+            x => x.SupportEmail == workspaceEmail,
+            cancellationToken);
+
+        if (exists)
+        {
+            throw new DomainException(
+                "Workspace alias already exists.");
+        }
+
         var normalizedEmail = request.OwnerEmail.Trim().ToLowerInvariant();
 
         var emailTaken = await _context.TeamMembers
@@ -94,6 +110,21 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
 
         //var slug = await GenerateUniqueSlugAsync(request.TenantName, cancellationToken);
 
+        var verified = await _context.EmailVerificationOtps
+        .AsNoTracking()
+        .AnyAsync(
+            x =>
+                x.Email == normalizedEmail &&
+                x.VerificationToken ==
+                    request.VerificationToken &&
+                x.IsUsed,
+            cancellationToken);
+
+        if (!verified)
+        {
+            throw new DomainException(
+                "Email must be verified.");
+        }
 
 
         var tenant = new Tenant
@@ -102,8 +133,11 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
             Slug = request.Slug,
             TicketPrefix = BuildTicketPrefix(request.Slug),
             Plan = TenantPlan.Trial,
-            Status = TenantStatus.Active
+            Status = TenantStatus.Active,
+            WorkspaceAlias = request.WorkspaceAlias,
+            SupportEmail = workspaceEmail
         };
+
 
         var slugExists = await _context.Tenants
     .AnyAsync(x => x.Slug == tenant.Slug, cancellationToken);
