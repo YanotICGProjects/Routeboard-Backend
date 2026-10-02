@@ -43,8 +43,12 @@ public class AppUrlProvider : IAppUrlProvider
                 $"Host '{host}' is not allowlisted.");
         }
 
-        var origin = $"{request.Scheme}://{host}";
+        if (host == "routeboard.online" ||
+            host == "staging.routeboard.online")
+        {
+            return $"https://{host}/accept-invite?token={Uri.EscapeDataString(inviteToken)}";
+        }
 
-        return $"{origin}/accept-invite?token={Uri.EscapeDataString(inviteToken)}";
+        return $"{request.Scheme}://{host}/accept-invite?token={Uri.EscapeDataString(inviteToken)}";
     }
 }
