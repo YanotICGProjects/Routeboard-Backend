@@ -16,7 +16,11 @@ public class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMember>
         // globally unique instead, because POST /auth/login as specified
         // takes only { email, password } with no tenant selector, which
         // only works if email resolves to exactly one account. See README.
-        builder.HasIndex(u => u.Email).IsUnique();
+        builder.HasIndex(x => new
+        {
+            x.TenantId,
+            x.Email
+        }).IsUnique();
 
         builder.Property(u => u.PasswordHash).IsRequired();
         builder.Property(u => u.FirstName).HasMaxLength(100);
