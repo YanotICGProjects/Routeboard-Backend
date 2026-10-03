@@ -18,10 +18,10 @@ public class SmtpSettings
     /// DI then falls back to the log-based EmailSender instead of this.</summary>
     public string Host { get; set; } = string.Empty;
 
-    public int Port { get; set; } = 587;
+    public int Port { get; set; } = 465;
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
-    public bool UseStartTls { get; set; } = true;
+    public bool UseStartTls { get; set; } = false;
     public string FromAddress { get; set; } = string.Empty;
-    public string FromName { get; set; } = "POSShopTicketing";
+    public string FromName { get; set; } = "RouteBoard";
 }

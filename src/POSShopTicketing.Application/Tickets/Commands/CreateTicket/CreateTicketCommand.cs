@@ -111,7 +111,7 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
             CreatorId = teamMember.Id,
             CreatorName = teamMember.FirstName + " " + teamMember.LastName,
             Source = TicketSource.Manual,
-            AssignedToTeamMemberId = request.AssignedToTeamMemberId,
+            AssignedToTeamMemberId = request.AssignedToTeamMemberId ?? assignedToTeamMemberId,
             DueAt = dueAt
         };
 
@@ -142,22 +142,25 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
         
 
         _context.Tickets.Add(ticket);
-        _context.Notifications.Add(new Notification
+        if (ticket.AssignedToTeamMemberId.HasValue)
         {
-            TenantId = tenantId,
-            TeamMemberId = teamMember.Id,
-            TicketId = ticket.Id,
-            Title = "New Ticket Created",
-            Message = $"Ticket {ticket.TicketNumber} has been created.",
-            IsRead = false
-        });
+            _context.Notifications.Add(new Notification
+            {
+                TenantId = tenantId,
+                TeamMemberId = ticket.AssignedToTeamMemberId.Value,
+                TicketId = ticket.Id,
+                Title = "Ticket Assigned",
+                Message = $"Ticket {ticket.TicketNumber} has been assigned to you.",
+                IsRead = false
+            });
+        }
         await _context.SaveChangesAsync(cancellationToken);
 
         await _publisher.Publish(
             new TicketCreatedEvent(tenantId, ticket.Id, ticket.TicketNumber, ticket.Subject, IsUnverified: false),
             cancellationToken);
 
-        if (assignedToTeamMemberId.HasValue)
+        if (ticket.AssignedToTeamMemberId.HasValue)
         {
             await _publisher.Publish(
                 new TicketAssignedEvent(tenantId, ticket.Id, ticket.TicketNumber, assignedToTeamMemberId.Value),

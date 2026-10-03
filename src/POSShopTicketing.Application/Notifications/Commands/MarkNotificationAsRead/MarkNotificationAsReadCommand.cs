@@ -12,11 +12,13 @@ public class MarkNotificationAsReadCommandHandler
     : IRequestHandler<MarkNotificationAsReadCommand>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
     public MarkNotificationAsReadCommandHandler(
-        IApplicationDbContext context)
+        IApplicationDbContext context, ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task Handle(
@@ -24,9 +26,10 @@ public class MarkNotificationAsReadCommandHandler
         CancellationToken cancellationToken)
     {
         var notification = await _context.Notifications
-            .FirstOrDefaultAsync(
-                x => x.Id == request.NotificationId,
-                cancellationToken);
+    .FirstOrDefaultAsync(
+        x => x.Id == request.NotificationId &&
+             x.TeamMemberId == _currentUserService.TeamMemberId,
+        cancellationToken);
 
         if (notification == null)
         {
