@@ -27,7 +27,7 @@ public class Tenant : BaseAuditableEntity
 
     public TenantStatus Status { get; set; } = TenantStatus.Active;
     public string WorkspaceAlias { get; set; } = string.Empty;
-
+    public string WorkspaceDomain { get; set; } = string.Empty;
     public string SupportEmail { get; set; } = string.Empty;
 
     public ICollection<TeamMember> TeamMembers { get; set; } = new List<TeamMember>();

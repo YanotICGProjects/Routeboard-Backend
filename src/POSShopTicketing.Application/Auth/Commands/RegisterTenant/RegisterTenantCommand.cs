@@ -30,9 +30,8 @@ public record RegisterTenantCommand : IRequest<AuthResultDto>
     public string OwnerPassword { get; init; } = string.Empty;
     public string OwnerFirstName { get; init; } = string.Empty;
     public string OwnerLastName { get; init; } = string.Empty;
-    public string Slug { get; init; } = string.Empty;
     public string WorkspaceAlias { get; init; } = string.Empty;
-
+    public string WorkspaceDomain { get; init; } = string.Empty;
     public string VerificationToken { get; init; } = string.Empty;
     public List<SignupInviteDto> Invites { get; init; } = new();
 }
@@ -130,23 +129,24 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
         var tenant = new Tenant
         {
             Name = request.TenantName.Trim(),
-            Slug = request.Slug,
-            TicketPrefix = BuildTicketPrefix(request.Slug),
+            Slug = request.WorkspaceAlias,
+            TicketPrefix = BuildTicketPrefix(request.WorkspaceAlias),
             Plan = TenantPlan.Trial,
             Status = TenantStatus.Active,
             WorkspaceAlias = request.WorkspaceAlias,
-            SupportEmail = workspaceEmail
+            SupportEmail = workspaceEmail,
+            WorkspaceDomain = request.WorkspaceDomain
         };
 
 
-        var slugExists = await _context.Tenants
-    .AnyAsync(x => x.Slug == tenant.Slug, cancellationToken);
+    //    var slugExists = await _context.Tenants
+    //.AnyAsync(x => x.Slug == tenant.Slug, cancellationToken);
 
-        if (slugExists)
-        {
-            throw new DomainException(
-                $"A tenant with slug '{tenant.Slug}' already exists.");
-        }
+    //    if (slugExists)
+    //    {
+    //        throw new DomainException(
+    //            $"A tenant with slug '{tenant.Slug}' already exists.");
+    //    }
 
         _context.Tenants.Add(tenant);
         await _context.SaveChangesAsync(cancellationToken);
