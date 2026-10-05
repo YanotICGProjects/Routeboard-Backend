@@ -163,7 +163,11 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
         if (ticket.AssignedToTeamMemberId.HasValue)
         {
             await _publisher.Publish(
-                new TicketAssignedEvent(tenantId, ticket.Id, ticket.TicketNumber, assignedToTeamMemberId.Value),
+                new TicketAssignedEvent(
+                    tenantId,
+                    ticket.Id,
+                    ticket.TicketNumber,
+                    ticket.AssignedToTeamMemberId.Value),
                 cancellationToken);
         }
 
