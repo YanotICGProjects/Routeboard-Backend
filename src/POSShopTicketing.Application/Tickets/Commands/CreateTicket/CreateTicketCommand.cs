@@ -154,6 +154,22 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
                 IsRead = false
             });
         }
+        else
+        {
+            _context.Notifications.Add(new Notification
+            {
+                TenantId = tenantId,
+                TeamMemberId = ticket.AssignedToTeamMemberId ?? teamMember.Id,
+                TicketId = ticket.Id,
+                Title = ticket.AssignedToTeamMemberId.HasValue
+        ? "Ticket Assigned"
+        : "Ticket Created",
+                Message = ticket.AssignedToTeamMemberId.HasValue
+        ? $"Ticket {ticket.TicketNumber} has been assigned to you."
+        : $"Ticket {ticket.TicketNumber} was created and is awaiting assignment.",
+                IsRead = false
+            });
+        }
         await _context.SaveChangesAsync(cancellationToken);
 
         await _publisher.Publish(

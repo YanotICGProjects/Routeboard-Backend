@@ -60,7 +60,9 @@ public class GetTicketsQueryHandler : IRequestHandler<GetTicketsQuery, Paginated
 
         if (request.AssignedToTeamMemberId.HasValue)
         {
-            query = query.Where(t => t.AssignedToTeamMemberId == request.AssignedToTeamMemberId.Value);
+            query = query.Where(t =>
+                t.AssignedToTeamMemberId == request.AssignedToTeamMemberId.Value
+                || !t.AssignedToTeamMemberId.HasValue);
         }
 
         if (request.Escalated.HasValue)
