@@ -15,6 +15,8 @@ public class Notification : BaseEntity, ITenantScoped
 
     public NotificationType Type { get; set; }
 
+    public string Email { get; set; } = string.Empty;
+
     public string Message { get; set; } = string.Empty;
 
     public string Title { get; set; } = string.Empty;

@@ -1,5 +1,6 @@
 ﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using POSShopTicketing.Application.Common.Exceptions;
 using POSShopTicketing.Application.Common.Interfaces;
 
@@ -13,10 +14,12 @@ public class MarkNotificationAsReadCommandHandler
 {
     private readonly IApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ILogger<MarkNotificationAsReadCommand> _logger;
 
     public MarkNotificationAsReadCommandHandler(
-        IApplicationDbContext context, ICurrentUserService currentUserService)
+        IApplicationDbContext context, ICurrentUserService currentUserService, ILogger<MarkNotificationAsReadCommand> logger)
     {
+        _logger = logger;
         _context = context;
         _currentUserService = currentUserService;
     }
@@ -43,5 +46,10 @@ public class MarkNotificationAsReadCommandHandler
         notification.ReadAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+    "Event Email: {EventEmail}, CurrentUser Email: {CurrentUserEmail}",
+    notification.Email,
+    _currentUserService.Email);
     }
 }
