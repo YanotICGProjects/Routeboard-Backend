@@ -89,8 +89,11 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
             tenantId, request.OrganizationId, request.OrganizationDepartmentId, request.OrganizationContactId, cancellationToken);
 
         var teamMember = await _context.TeamMembers
-            .IgnoreQueryFilters() // login runs before a tenant is known
-            .FirstOrDefaultAsync(u => u.Email == _currentUserService.Email.ToString(), cancellationToken);
+    .IgnoreQueryFilters()
+    .FirstOrDefaultAsync(
+        u => u.Email == _currentUserService.Email,
+        cancellationToken)
+    ?? throw new ForbiddenException("Current team member could not be found.");
 
         var ticket = new Ticket
         {
@@ -143,8 +146,9 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
 
         _context.Tickets.Add(ticket);
 
-        // Only create a notification here when the ticket is unassigned.
-        // Assigned ticket notifications will be handled by TicketAssignedEvent.
+        // Create an in-app notification only when the ticket is not assigned.
+        // Assigned ticket notifications should be handled by the
+        // TicketAssignedEventHandler.
         if (!ticket.AssignedToTeamMemberId.HasValue)
         {
             _context.Notifications.Add(new Notification
@@ -161,10 +165,17 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        // Always publish TicketCreatedEvent
         await _publisher.Publish(
-            new TicketCreatedEvent(tenantId, ticket.Id, ticket.TicketNumber, ticket.Subject, IsUnverified: false),
+            new TicketCreatedEvent(
+                tenantId,
+                ticket.Id,
+                ticket.TicketNumber,
+                ticket.Subject,
+                IsUnverified: false),
             cancellationToken);
 
+        // Only publish assignment event when there is an assignee
         if (ticket.AssignedToTeamMemberId.HasValue)
         {
             await _publisher.Publish(
