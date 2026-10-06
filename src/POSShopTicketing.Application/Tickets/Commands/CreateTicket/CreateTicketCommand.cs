@@ -138,39 +138,27 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
             Body = _htmlSanitizer.Sanitize(request.InitialMessageBody)
         });
 
-        
-        
+
+
 
         _context.Tickets.Add(ticket);
-        if (ticket.AssignedToTeamMemberId.HasValue)
+
+        // Only create a notification here when the ticket is unassigned.
+        // Assigned ticket notifications will be handled by TicketAssignedEvent.
+        if (!ticket.AssignedToTeamMemberId.HasValue)
         {
             _context.Notifications.Add(new Notification
             {
                 TenantId = tenantId,
-                TeamMemberId = ticket.AssignedToTeamMemberId.Value,
+                TeamMemberId = teamMember.Id,
                 TicketId = ticket.Id,
-                Title = "Ticket Assigned",
-                Message = $"Ticket {ticket.TicketNumber} has been assigned to you.",
-                IsRead = false
-            });
-        }
-        else
-        {
-            _context.Notifications.Add(new Notification
-            {
-                TenantId = tenantId,
-                TeamMemberId = ticket.AssignedToTeamMemberId ?? teamMember.Id,
-                TicketId = ticket.Id,
-                Title = ticket.AssignedToTeamMemberId.HasValue
-        ? "Ticket Assigned"
-        : "Ticket Created",
-                Message = ticket.AssignedToTeamMemberId.HasValue
-        ? $"Ticket {ticket.TicketNumber} has been assigned to you."
-        : $"Ticket {ticket.TicketNumber} was created and is awaiting assignment.",
+                Title = "Ticket Created",
+                Message = $"Ticket {ticket.TicketNumber} was created and is awaiting assignment.",
                 IsRead = false,
-                CreatedAt = _dateTime.Now     
+                CreatedAt = now
             });
         }
+
         await _context.SaveChangesAsync(cancellationToken);
 
         await _publisher.Publish(
