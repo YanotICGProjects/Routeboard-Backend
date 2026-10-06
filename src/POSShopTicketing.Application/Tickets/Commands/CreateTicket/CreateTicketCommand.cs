@@ -167,7 +167,8 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
                 Message = ticket.AssignedToTeamMemberId.HasValue
         ? $"Ticket {ticket.TicketNumber} has been assigned to you."
         : $"Ticket {ticket.TicketNumber} was created and is awaiting assignment.",
-                IsRead = false
+                IsRead = false,
+                CreatedAt = _dateTime.Now     
             });
         }
         await _context.SaveChangesAsync(cancellationToken);
