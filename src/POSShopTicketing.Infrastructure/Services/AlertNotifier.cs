@@ -42,6 +42,7 @@ public class AlertNotifier : IAlertNotifier
             TeamMemberId = message.TeamMemberId.Value,
             Type = message.Type,
             Title = message.Title,
+            Message = message.Body,
             Body = message.Body,
             TicketId = message.TicketId,
             IsRead = false,

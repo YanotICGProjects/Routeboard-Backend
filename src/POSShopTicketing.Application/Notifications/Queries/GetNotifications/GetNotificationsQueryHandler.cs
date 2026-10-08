@@ -31,7 +31,9 @@ public class GetNotificationsQueryHandler
                 Id = x.Id,
                 TicketId = x.TicketId,
                 Title = x.Title,
-                Message = x.Message,
+                Message = !string.IsNullOrWhiteSpace(x.Message)
+        ? x.Message
+        : x.Body,
                 IsRead = x.IsRead,
                 CreatedAt = x.CreatedAt,
                 ReadAt = x.ReadAt
