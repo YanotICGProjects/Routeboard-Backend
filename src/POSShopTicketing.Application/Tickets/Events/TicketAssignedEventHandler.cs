@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using POSShopTicketing.Application.Common.Interfaces;
 using POSShopTicketing.Application.Common.Models;
 using POSShopTicketing.Domain.Enums;
@@ -12,15 +13,17 @@ public class TicketAssignedEventHandler
     private readonly IAlertNotifier _alertNotifier;
     private readonly IApplicationDbContext _context;
     private readonly IEmailSender _emailSender;
+    private readonly ILogger<TicketAssignedEventHandler> _logger;
 
     public TicketAssignedEventHandler(
         IAlertNotifier alertNotifier,
         IApplicationDbContext context,
-        IEmailSender emailSender)
+        IEmailSender emailSender, ILogger<TicketAssignedEventHandler> logger)
     {
         _alertNotifier = alertNotifier;
         _context = context;
         _emailSender = emailSender;
+        _logger = logger;
     }
 
     public async Task Handle(
@@ -63,10 +66,15 @@ public class TicketAssignedEventHandler
         }
 
         // Self-assignment
-        if (assigner.Id == assignee.Id)
-        {
-            return;
-        }
+        //if (assigner.Id == assignee.Id)
+        //{
+        //    return;
+        //}
+
+        _logger.LogInformation(
+    "Assigner={AssignerId} Assignee={AssigneeId}",
+    assigner.Id,
+    assignee.Id);
 
         // =====================================================
         // ASSIGNEE NOTIFICATION + EMAIL
@@ -110,6 +118,14 @@ public class TicketAssignedEventHandler
                     Thank you.
                 </p>
             </div>";
+
+            Console.WriteLine(
+    $"ASSIGNMENT EMAIL -> {assignee.Email} | Ticket={ticket.TicketNumber}");
+
+            _logger.LogInformation(
+    "ASSIGNMENT EMAIL -> {Email} | Ticket={TicketNumber}",
+    assignee.Email,
+    ticket.TicketNumber);
 
             await _emailSender.SendAsync(
                 assignee.Email,
@@ -162,6 +178,8 @@ public class TicketAssignedEventHandler
                     Thank you.
                 </p>
             </div>";
+
+
 
             await _emailSender.SendAsync(
                 assigner.Email,
