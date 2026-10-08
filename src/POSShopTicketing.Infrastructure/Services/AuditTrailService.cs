@@ -39,7 +39,9 @@ public class AuditTrailService : IAuditTrailService
         _logger = logger;
     }
 
-    public async Task RecordAsync(AuditTrailEntry entry, CancellationToken cancellationToken)
+    public async Task RecordAsync(
+    AuditTrailEntry entry,
+    CancellationToken cancellationToken)
     {
         _context.AuditLogs.Add(new AuditLog
         {
@@ -54,33 +56,6 @@ public class AuditTrailService : IAuditTrailService
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        if (!_settings.Enabled || entry.TenantId is not { } tenantId)
-        {
-            return;
-        }
-
-        var recipients = await _context.TeamMembers
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(u => u.TenantId == tenantId
-                        && u.Status == TeamMemberStatus.Active
-                        && (u.Role == TeamMemberRole.Owner || u.Role == TeamMemberRole.Admin))
-            .Select(u => new { u.Email, FullName = u.FirstName + " " + u.LastName })
-            .ToListAsync(cancellationToken);
-
-        if (recipients.Count == 0)
-        {
-            _logger.LogWarning("Audit event {Action} on tenant {TenantId} has no active Owner/Admin to email", entry.Action, tenantId);
-            return;
-        }
-
-        var subject = $"[POSShopTicketing] {entry.Action}: {entry.ActorDisplayName}";
-        var bodyHtml = $"<p>{System.Net.WebUtility.HtmlEncode(entry.Summary)}</p>" +
-                       $"<p style=\"color:#666;font-size:12px\">{_dateTime.Now:yyyy-MM-dd HH:mm:ss} UTC</p>";
-
-        foreach (var recipient in recipients)
-        {
-            await _emailSender.SendAsync(recipient.Email, recipient.FullName, subject, bodyHtml, cancellationToken);
-        }
+        return;
     }
 }
