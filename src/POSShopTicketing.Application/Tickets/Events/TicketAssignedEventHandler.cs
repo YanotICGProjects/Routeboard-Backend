@@ -6,7 +6,8 @@ using POSShopTicketing.Domain.Enums;
 
 namespace POSShopTicketing.Application.Tickets.Events;
 
-public class TicketAssignedEventHandler : INotificationHandler<TicketAssignedEvent>
+public class TicketAssignedEventHandler
+    : INotificationHandler<TicketAssignedEvent>
 {
     private readonly IAlertNotifier _alertNotifier;
     private readonly IApplicationDbContext _context;
@@ -23,8 +24,8 @@ public class TicketAssignedEventHandler : INotificationHandler<TicketAssignedEve
     }
 
     public async Task Handle(
-     TicketAssignedEvent notification,
-     CancellationToken cancellationToken)
+        TicketAssignedEvent notification,
+        CancellationToken cancellationToken)
     {
         var ticket = await _context.Tickets
             .AsNoTracking()
@@ -49,22 +50,27 @@ public class TicketAssignedEventHandler : INotificationHandler<TicketAssignedEve
             return;
         }
 
-        var creator = await _context.TeamMembers
+        var assigner = await _context.TeamMembers
             .IgnoreQueryFilters()
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                x => x.Id == ticket.CreatorId,
+                x => x.Id == notification.AssignedByTeamMemberId,
                 cancellationToken);
 
-        // Self-assignment: do nothing
-        if (creator is not null && creator.Id == assignee.Id)
+        if (assigner is null)
         {
             return;
         }
 
-        // ==================================================
-        // Notify Assignee (User B)
-        // ==================================================
+        // Self-assignment
+        if (assigner.Id == assignee.Id)
+        {
+            return;
+        }
+
+        // =====================================================
+        // ASSIGNEE NOTIFICATION + EMAIL
+        // =====================================================
 
         await _alertNotifier.NotifyAsync(
             new AlertMessage(
@@ -79,25 +85,31 @@ public class TicketAssignedEventHandler : INotificationHandler<TicketAssignedEve
         if (!string.IsNullOrWhiteSpace(assignee.Email))
         {
             var assigneeHtmlBody = $@"
-        <div style='font-family:Arial,sans-serif;font-size:14px;line-height:1.6'>
-            <p>Hello {assignee.FullName},</p>
+            <div style='font-family:Arial,sans-serif;font-size:14px;line-height:1.6'>
+                <p>Hello {assignee.FullName},</p>
 
-            <p>A ticket has been assigned to you in RouteBoard.</p>
+                <p>
+                    A ticket has been assigned to you in RouteBoard.
+                </p>
 
-            <p>
-                <strong>Ticket Number:</strong><br/>
-                {ticket.TicketNumber}
-            </p>
+                <p>
+                    <strong>Ticket Number:</strong><br/>
+                    {ticket.TicketNumber}
+                </p>
 
-            <p>
-                <strong>Subject:</strong><br/>
-                {ticket.Subject}
-            </p>
+                <p>
+                    <strong>Subject:</strong><br/>
+                    {ticket.Subject}
+                </p>
 
-            <p>Please log in to RouteBoard to review and process this ticket.</p>
+                <p>
+                    Please log in to RouteBoard to review and process this ticket.
+                </p>
 
-            <p>Thank you.</p>
-        </div>";
+                <p>
+                    Thank you.
+                </p>
+            </div>";
 
             await _emailSender.SendAsync(
                 assignee.Email,
@@ -107,29 +119,29 @@ public class TicketAssignedEventHandler : INotificationHandler<TicketAssignedEve
                 cancellationToken);
         }
 
-        // ==================================================
-        // Notify Creator (User A)
-        // ==================================================
+        // =====================================================
+        // ASSIGNER NOTIFICATION + EMAIL
+        // =====================================================
 
-        if (creator is not null)
+        await _alertNotifier.NotifyAsync(
+            new AlertMessage(
+                NotificationType.TicketAssigned,
+                $"Ticket {ticket.TicketNumber} assigned",
+                $"You assigned Ticket {ticket.TicketNumber} to {assignee.FullName}.",
+                notification.TenantId,
+                ticket.Id,
+                assigner.Id),
+            cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(assigner.Email))
         {
-            await _alertNotifier.NotifyAsync(
-                new AlertMessage(
-                    NotificationType.TicketAssigned,
-                    $"Ticket {ticket.TicketNumber} assigned",
-                    $"You assigned Ticket {ticket.TicketNumber} to {assignee.FullName}.",
-                    notification.TenantId,
-                    ticket.Id,
-                    creator.Id),
-                cancellationToken);
-
-            if (!string.IsNullOrWhiteSpace(creator.Email))
-            {
-                var creatorHtmlBody = $@"
+            var assignerHtmlBody = $@"
             <div style='font-family:Arial,sans-serif;font-size:14px;line-height:1.6'>
-                <p>Hello {creator.FullName},</p>
+                <p>Hello {assigner.FullName},</p>
 
-                <p>You successfully assigned a ticket.</p>
+                <p>
+                    You successfully assigned a ticket in RouteBoard.
+                </p>
 
                 <p>
                     <strong>Ticket Number:</strong><br/>
@@ -146,17 +158,17 @@ public class TicketAssignedEventHandler : INotificationHandler<TicketAssignedEve
                     {assignee.FullName}
                 </p>
 
-                <p>Thank you.</p>
+                <p>
+                    Thank you.
+                </p>
             </div>";
 
-                await _emailSender.SendAsync(
-                    creator.Email,
-                    creator.FullName,
-                    $"Ticket {ticket.TicketNumber} Assigned",
-                    creatorHtmlBody,
-                    cancellationToken);
-            }
+            await _emailSender.SendAsync(
+                assigner.Email,
+                assigner.FullName,
+                $"Ticket {ticket.TicketNumber} Assigned",
+                assignerHtmlBody,
+                cancellationToken);
         }
     }
-
 }

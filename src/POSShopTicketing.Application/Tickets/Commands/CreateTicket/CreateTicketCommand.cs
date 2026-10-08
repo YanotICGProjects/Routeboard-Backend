@@ -175,9 +175,8 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
                 IsUnverified: false),
             cancellationToken);
 
-        // Only publish assignment event when there is an assignee
-        // Only publish assignment event when assigned
-        // to a different team member.
+        // Publish assignment event only when assigned
+        // to someone other than the creator.
         if (ticket.AssignedToTeamMemberId.HasValue &&
             ticket.AssignedToTeamMemberId.Value != teamMember.Id)
         {
@@ -186,7 +185,8 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
                     tenantId,
                     ticket.Id,
                     ticket.TicketNumber,
-                    ticket.AssignedToTeamMemberId.Value),
+                    ticket.AssignedToTeamMemberId.Value,
+                    teamMember.Id),
                 cancellationToken);
         }
 
