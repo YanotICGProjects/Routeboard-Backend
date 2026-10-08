@@ -51,12 +51,18 @@ public class TicketAssignedEventHandler : INotificationHandler<TicketAssignedEve
 
         // Load ticket
         var ticket = await _context.Tickets
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.Id == notification.TicketId,
-                cancellationToken);
+    .AsNoTracking()
+    .FirstOrDefaultAsync(
+        x => x.Id == notification.TicketId,
+        cancellationToken);
 
         if (ticket is null)
+        {
+            return;
+        }
+
+        // Don't notify users about tickets assigned to themselves.
+        if (ticket.CreatorId == notification.AssignedToTeamMemberId)
         {
             return;
         }

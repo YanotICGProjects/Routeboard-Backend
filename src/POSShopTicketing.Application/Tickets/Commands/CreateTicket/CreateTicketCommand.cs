@@ -176,7 +176,10 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
             cancellationToken);
 
         // Only publish assignment event when there is an assignee
-        if (ticket.AssignedToTeamMemberId.HasValue)
+        // Only publish assignment event when assigned
+        // to a different team member.
+        if (ticket.AssignedToTeamMemberId.HasValue &&
+            ticket.AssignedToTeamMemberId.Value != teamMember.Id)
         {
             await _publisher.Publish(
                 new TicketAssignedEvent(
