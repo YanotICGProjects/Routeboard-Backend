@@ -1,6 +1,8 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using POSShopTicketing.Application.Common.Interfaces;
 using POSShopTicketing.Application.Common.Models;
+using POSShopTicketing.Domain.Entities;
 
 namespace POSShopTicketing.Application.Tickets.Events;
 
@@ -21,23 +23,57 @@ public class TicketCreatedAuditHandler : INotificationHandler<TicketCreatedEvent
         _context = context;
     }
 
-    public async Task Handle(TicketCreatedEvent notification, CancellationToken cancellationToken)
+    public async Task Handle(
+     TicketCreatedEvent notification,
+     CancellationToken cancellationToken)
     {
-        var (teamMemberId, actorDisplayName) = await TicketAuditActor.ResolveAsync(
-            notification.TicketId, _currentUserService, _context,
-            systemFallbackDisplayName: "System", useCustomerEmailAsFallback: true, cancellationToken);
+        var ticket = await _context.Tickets
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.Id == notification.TicketId,
+                cancellationToken);
 
-        var statusNote = notification.IsUnverified ? " (Unverified - awaiting triage)" : string.Empty;
-
-        await _auditTrailService.RecordAsync(new AuditTrailEntry
+        if (ticket is null)
         {
-            TenantId = notification.TenantId,
-            ActorTeamMemberId = teamMemberId,
-            ActorDisplayName = actorDisplayName,
-            Action = "Ticket.Created",
-            EntityType = nameof(Domain.Entities.Ticket),
-            EntityId = notification.TicketId.ToString(),
-            Summary = $"{actorDisplayName} created ticket {notification.TicketNumber}: \"{notification.Subject}\"{statusNote}."
-        }, cancellationToken);
+            return;
+        }
+
+        // Ticket created and assigned to self
+        // => skip audit email
+        if (ticket.AssignedToTeamMemberId.HasValue &&
+            ticket.AssignedToTeamMemberId == ticket.CreatorId)
+        {
+            return;
+        }
+
+        var (teamMemberId, actorDisplayName) =
+            await TicketAuditActor.ResolveAsync(
+                notification.TicketId,
+                _currentUserService,
+                _context,
+                systemFallbackDisplayName: "System",
+                useCustomerEmailAsFallback: true,
+                cancellationToken);
+
+        var statusNote =
+            notification.IsUnverified
+                ? " (Unverified - awaiting triage)"
+                : string.Empty;
+
+        await _auditTrailService.RecordAsync(
+            new AuditTrailEntry
+            {
+                TenantId = notification.TenantId,
+                ActorTeamMemberId = teamMemberId,
+                ActorDisplayName = actorDisplayName,
+                Action = "Ticket.Created",
+                EntityType = nameof(Ticket),
+                EntityId = notification.TicketId.ToString(),
+                Summary =
+                    $"{actorDisplayName} created ticket " +
+                    $"{notification.TicketNumber}: " +
+                    $"\"{notification.Subject}\"{statusNote}."
+            },
+            cancellationToken);
     }
 }

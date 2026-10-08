@@ -67,40 +67,40 @@ public class TicketCreatedEventHandler : INotificationHandler<TicketCreatedEvent
             return;
         }
 
-        //await _emailSender.SendAsync(
-        //    creator.Email,
-        //    creator.FullName,
-        //    $"Ticket {ticket.TicketNumber} Created",
-        //    $@"
-        //    <div style='font-family:Arial,sans-serif;font-size:14px;line-height:1.6'>
-        //        <p>Hello {creator.FullName},</p>
+        await _emailSender.SendAsync(
+            creator.Email,
+            creator.FullName,
+            $"Ticket {ticket.TicketNumber} Created",
+            $@"
+            <div style='font-family:Arial,sans-serif;font-size:14px;line-height:1.6'>
+                <p>Hello {creator.FullName},</p>
 
-        //        <p>
-        //            Your ticket has been created successfully in RouteBoard.
-        //        </p>
+                <p>
+                    Your ticket has been created successfully in RouteBoard.
+                </p>
 
-        //        <p>
-        //            <strong>Ticket Number:</strong>
-        //            {ticket.TicketNumber}
-        //        </p>
+                <p>
+                    <strong>Ticket Number:</strong>
+                    {ticket.TicketNumber}
+                </p>
 
-        //        <p>
-        //            <strong>Subject:</strong>
-        //            {ticket.Subject}
-        //        </p>
+                <p>
+                    <strong>Subject:</strong>
+                    {ticket.Subject}
+                </p>
 
-        //        <p>
-        //            This ticket is currently awaiting assignment.
-        //        </p>
+                <p>
+                    This ticket is currently awaiting assignment.
+                </p>
 
-        //        <p>
-        //            You will receive further updates when a team member is assigned.
-        //        </p>
+                <p>
+                    You will receive further updates when a team member is assigned.
+                </p>
 
-        //        <p>
-        //            Thank you.
-        //        </p>
-        //    </div>",
-        //    cancellationToken);
+                <p>
+                    Thank you.
+                </p>
+            </div>",
+            cancellationToken);
     }
 }
