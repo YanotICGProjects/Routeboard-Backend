@@ -33,6 +33,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<AssignmentRule> AssignmentRules => Set<AssignmentRule>();
     public DbSet<Mailbox> Mailboxes => Set<Mailbox>();
     public DbSet<Ticket> Tickets => Set<Ticket>();
+    public DbSet<TicketAttachment> TicketAttachments
+    => Set<TicketAttachment>();
     public DbSet<TicketMessage> TicketMessages => Set<TicketMessage>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
     public DbSet<TicketStatusHistory> TicketStatusHistories => Set<TicketStatusHistory>();

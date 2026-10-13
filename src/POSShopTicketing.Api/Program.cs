@@ -2,18 +2,24 @@ using Hangfire;
 using Hangfire.Dashboard;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Newtonsoft.Json.Linq;
 using POSShopTicketing.Api.Middleware;
 using POSShopTicketing.Application;
 using POSShopTicketing.Application.Auth.Common;
+using POSShopTicketing.Application.Common.Interfaces;
 using POSShopTicketing.Infrastructure;
 using POSShopTicketing.Infrastructure.BackgroundJobs;
 using POSShopTicketing.Infrastructure.Identity;
+using POSShopTicketing.Infrastructure.Inbound;
 using POSShopTicketing.Infrastructure.Persistence;
+using POSShopTicketing.Infrastructure.Storage;
 using Serilog;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -67,6 +73,24 @@ try
             retainedFileCountLimit: 31));
 
     // ---- Services -------------------------------------------------------
+
+    builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Resend"));
+    builder.Services.Configure<AttachmentStorageOptions>(builder.Configuration.GetSection("Attachments"));
+
+    builder.Services.AddHttpClient(ResendReceivingClient.ApiClientName, (sp, http) =>
+    {
+        var o = sp.GetRequiredService<IOptions<ResendOptions>>().Value;
+        http.BaseAddress = new Uri(o.BaseUrl);            // must end with "/"
+        http.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", o.ApiKey);
+        http.Timeout = TimeSpan.FromSeconds(30);
+    });
+    builder.Services.AddHttpClient();                      // plain client used for file downloads
+
+    builder.Services.AddScoped<ResendReceivingClient>();
+    builder.Services.AddScoped<ResendInboundAdapter>();
+    builder.Services.AddSingleton<IAttachmentStorage, LocalDiskAttachmentStorage>();
+
 
     builder.Services
         .AddControllers(options =>

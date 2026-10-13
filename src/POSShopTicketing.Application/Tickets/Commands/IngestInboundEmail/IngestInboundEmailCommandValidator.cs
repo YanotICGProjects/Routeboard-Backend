@@ -6,8 +6,8 @@ public class IngestInboundEmailCommandValidator : AbstractValidator<IngestInboun
 {
     public IngestInboundEmailCommandValidator()
     {
-        RuleFor(v => v.MailboxId).NotEmpty();
-        RuleFor(v => v.WebhookSecret).NotEmpty();
+        //RuleFor(v => v.MailboxId).NotEmpty();
+        //RuleFor(v => v.WebhookSecret).NotEmpty();
         RuleFor(v => v.SenderEmail).NotEmpty().EmailAddress();
         RuleFor(v => v.Subject).MaximumLength(250);
         RuleFor(v => v.BodyHtml).NotEmpty();

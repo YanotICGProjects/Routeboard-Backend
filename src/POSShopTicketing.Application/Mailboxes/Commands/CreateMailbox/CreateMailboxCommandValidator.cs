@@ -6,11 +6,14 @@ public class CreateMailboxCommandValidator : AbstractValidator<CreateMailboxComm
 {
     public CreateMailboxCommandValidator()
     {
-        // Omitted entirely -> zero-setup system-provided address (see
-        // the handler). Only validated as an email when actually supplied.
-        RuleFor(v => v.EmailAddress)
-            .EmailAddress().MaximumLength(200)
-            .When(v => !string.IsNullOrWhiteSpace(v.EmailAddress));
+        // null = zero-setup system address. If a value IS supplied it must be a real address.
+        When(v => v.EmailAddress is not null, () =>
+        {
+            RuleFor(v => v.EmailAddress)
+                .NotEmpty().WithMessage("Omit the email address to get the system address, or enter a valid one.")
+                .MaximumLength(200)
+                .EmailAddress();
+        });
 
         RuleFor(v => v.Provider).IsInEnum();
     }

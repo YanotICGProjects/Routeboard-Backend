@@ -17,6 +17,7 @@ public interface IApplicationDbContext
     DbSet<AssignmentRule> AssignmentRules { get; }
     DbSet<Mailbox> Mailboxes { get; }
     DbSet<Ticket> Tickets { get; }
+    DbSet<TicketAttachment> TicketAttachments { get; }
     DbSet<TicketMessage> TicketMessages { get; }
     DbSet<Attachment> Attachments { get; }
     DbSet<TicketStatusHistory> TicketStatusHistories { get; }

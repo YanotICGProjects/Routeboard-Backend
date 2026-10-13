@@ -9,6 +9,7 @@ using POSShopTicketing.Infrastructure.Identity;
 using POSShopTicketing.Infrastructure.Persistence;
 using POSShopTicketing.Infrastructure.Persistence.Interceptors;
 using POSShopTicketing.Infrastructure.Services;
+using POSShopTicketing.Infrastructure.Storage;
 
 namespace POSShopTicketing.Infrastructure;
 
@@ -42,6 +43,11 @@ public static class DependencyInjection
         services.AddScoped<ITicketPriorityClassifier, TicketPriorityClassifier>();
         services.AddScoped<IAlertNotifier, AlertNotifier>();
         services.AddScoped<IHtmlSanitizerService, HtmlSanitizerService>();
+        services.Configure<AttachmentStorageOptions>(
+    configuration.GetSection("Attachments"));
+
+        services.AddScoped<IAttachmentStorage,
+            LocalDiskAttachmentStorage>();
 
         // Outbound email: any SMTP-capable provider once Smtp:Host is
         // set (Hostinger's own mail hosting, Gmail, Amazon SES, Mailgun,

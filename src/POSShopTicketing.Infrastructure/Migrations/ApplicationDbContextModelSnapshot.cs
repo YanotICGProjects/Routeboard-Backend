@@ -832,6 +832,67 @@ namespace POSShopTicketing.Infrastructure.Migrations
                     b.ToTable("Tickets", (string)null);
                 });
 
+            modelBuilder.Entity("POSShopTicketing.Domain.Entities.TicketAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsInline")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TicketMessageId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TicketMessageId");
+
+                    b.HasIndex("TenantId", "TicketId");
+
+                    b.ToTable("TicketAttachments", (string)null);
+                });
+
             modelBuilder.Entity("POSShopTicketing.Domain.Entities.TicketMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1094,6 +1155,17 @@ namespace POSShopTicketing.Infrastructure.Migrations
                     b.Navigation("OrganizationContact");
 
                     b.Navigation("OrganizationDepartment");
+                });
+
+            modelBuilder.Entity("POSShopTicketing.Domain.Entities.TicketAttachment", b =>
+                {
+                    b.HasOne("POSShopTicketing.Domain.Entities.TicketMessage", "TicketMessage")
+                        .WithMany()
+                        .HasForeignKey("TicketMessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TicketMessage");
                 });
 
             modelBuilder.Entity("POSShopTicketing.Domain.Entities.TicketMessage", b =>

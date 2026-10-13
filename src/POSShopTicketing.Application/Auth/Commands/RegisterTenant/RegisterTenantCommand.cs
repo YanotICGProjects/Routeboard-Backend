@@ -13,6 +13,8 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using POSShopTicketing.Application.Common.Mailboxes;                    // WorkspaceAliasRules
+using POSShopTicketing.Application.Mailboxes.Commands.CreateMailbox;    // MailboxSecrets
 
 namespace POSShopTicketing.Application.Auth.Commands.RegisterTenant;
 
@@ -47,7 +49,7 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
     private readonly IPublisher _publisher;
     private readonly IDateTime _dateTime;
     private readonly IAppUrlProvider _appUrlProvider;
-
+    private readonly ISystemMailboxAddressProvider _systemMailboxAddressProvider;
     private readonly IRefreshTokenService _tokenService;
 
     private static string ComputeHash(string value)
@@ -67,7 +69,7 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
         IRefreshTokenService tokenService,
         IEmailSender emailSender,
         IAppUrlProvider appUrlProvider,
-        IDateTime dateTime)
+        IDateTime dateTime, ISystemMailboxAddressProvider systemMailboxAddressProvider)
     {
         _context = context;
         _currentTenantService = currentTenantService;
@@ -79,11 +81,17 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
         _appUrlProvider = appUrlProvider;
         _emailSender = emailSender;
         _dateTime = dateTime;
+        _systemMailboxAddressProvider = systemMailboxAddressProvider;
     }
 
     public async Task<AuthResultDto> Handle(RegisterTenantCommand request, CancellationToken cancellationToken)
     {
-        var workspaceEmail = $"{request.WorkspaceAlias}@support.routeboard.online";
+        if (!WorkspaceAliasRules.TryNormalize(request.WorkspaceAlias, out var alias, out var aliasError))
+        {
+            throw new DomainException(aliasError!);
+        }
+
+        var workspaceEmail = _systemMailboxAddressProvider.BuildAddress(alias);
 
         var exists = await _context.Tenants
         .AnyAsync(
@@ -129,11 +137,11 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
         var tenant = new Tenant
         {
             Name = request.TenantName.Trim(),
-            Slug = request.WorkspaceAlias,
-            TicketPrefix = BuildTicketPrefix(request.WorkspaceAlias),
+            Slug = alias,
+            TicketPrefix = BuildTicketPrefix(alias),
             Plan = TenantPlan.Trial,
             Status = TenantStatus.Active,
-            WorkspaceAlias = request.WorkspaceAlias,
+            WorkspaceAlias = alias,
             SupportEmail = workspaceEmail,
             WorkspaceDomain = request.WorkspaceDomain
         };
@@ -157,7 +165,17 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
         // tenant we just created is the one to scope that write to.
         _currentTenantService.SetTenant(tenant.Id);
 
-      
+        _context.Mailboxes.Add(new Mailbox
+        {
+            TenantId = tenant.Id,
+            EmailAddress = workspaceEmail,
+            Provider = MailboxProvider.ResendInbound,   //
+            WebhookSecret = MailboxSecrets.Generate(),
+            IsVerified = true,
+            IsSystemProvided = true,
+            IsDefault = true
+        });
+
         var expiresAt = _dateTime.Now.AddDays(7);
 
         foreach (var invite in request.Invites)
