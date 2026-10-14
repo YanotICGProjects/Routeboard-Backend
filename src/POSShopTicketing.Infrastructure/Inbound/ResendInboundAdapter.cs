@@ -155,7 +155,16 @@ public class ResendReceivingClient
     {
         var http = _factory.CreateClient(ApiClientName);
         using var response = await http.GetAsync($"emails/receiving/{Uri.EscapeDataString(emailId)}", ct);
+        var content = await response.Content.ReadAsStringAsync(ct);
+
+        Console.WriteLine(
+            "Resend Response: {StatusCode} {Body}",
+            response.StatusCode,
+            content);
+
         response.EnsureSuccessStatusCode();
+
+
 
         var body = await response.Content.ReadAsStringAsync(ct);
         return JsonSerializer.Deserialize<ResendReceivedEmail>(body, Json)
