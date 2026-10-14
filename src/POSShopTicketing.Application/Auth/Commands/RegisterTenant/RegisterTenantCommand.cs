@@ -52,13 +52,6 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
     private readonly ISystemMailboxAddressProvider _systemMailboxAddressProvider;
     private readonly IRefreshTokenService _tokenService;
 
-    private static string ComputeHash(string value)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
-
-        return Convert.ToHexString(bytes);
-    }
-
     public RegisterTenantCommandHandler(
         IApplicationDbContext context,
         ICurrentTenantService currentTenantService,
