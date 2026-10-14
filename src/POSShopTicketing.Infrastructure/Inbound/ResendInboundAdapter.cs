@@ -158,25 +158,28 @@ public class ResendReceivingClient
         _logger = logger;
     }
 
-    public async Task<ResendReceivedEmail> GetEmailAsync(string emailId, CancellationToken ct)
+    public async Task<ResendReceivedEmail> GetEmailAsync(
+    string emailId,
+    CancellationToken ct)
     {
         var http = _factory.CreateClient(ApiClientName);
-        using var response = await http.GetAsync($"emails/receiving/{Uri.EscapeDataString(emailId)}", ct);
-        var content = await response.Content.ReadAsStringAsync(ct);
 
-        
+        using var response = await http.GetAsync(
+            $"emails/receiving/{Uri.EscapeDataString(emailId)}",
+            ct);
+
+        var body = await response.Content.ReadAsStringAsync(ct);
+
+        _logger.LogInformation(
+            "Resend Status: {StatusCode} Body: {Body}",
+            response.StatusCode,
+            body);
 
         response.EnsureSuccessStatusCode();
 
-
-
-        var body = await response.Content.ReadAsStringAsync(ct);
-        _logger.LogInformation(
-    "Resend Status: {StatusCode} Body: {Body}",
-    response.StatusCode,
-    body);
         return JsonSerializer.Deserialize<ResendReceivedEmail>(body, Json)
-            ?? throw new InvalidOperationException("Resend returned an empty received-email response.");
+            ?? throw new InvalidOperationException(
+                "Resend returned an empty received-email response.");
     }
 
     public async Task<List<ResendAttachment>> GetAttachmentsAsync(string emailId, CancellationToken ct)
