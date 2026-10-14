@@ -148,8 +148,15 @@ public class ResendReceivingClient
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
     private readonly IHttpClientFactory _factory;
+    private readonly ILogger<ResendReceivingClient> _logger;
 
-    public ResendReceivingClient(IHttpClientFactory factory) => _factory = factory;
+    public ResendReceivingClient(
+        IHttpClientFactory factory,
+        ILogger<ResendReceivingClient> logger)
+    {
+        _factory = factory;
+        _logger = logger;
+    }
 
     public async Task<ResendReceivedEmail> GetEmailAsync(string emailId, CancellationToken ct)
     {
@@ -157,16 +164,17 @@ public class ResendReceivingClient
         using var response = await http.GetAsync($"emails/receiving/{Uri.EscapeDataString(emailId)}", ct);
         var content = await response.Content.ReadAsStringAsync(ct);
 
-        Console.WriteLine(
-            "Resend Response: {StatusCode} {Body}",
-            response.StatusCode,
-            content);
+        
 
         response.EnsureSuccessStatusCode();
 
 
 
         var body = await response.Content.ReadAsStringAsync(ct);
+        _logger.LogInformation(
+    "Resend Status: {StatusCode} Body: {Body}",
+    response.StatusCode,
+    body);
         return JsonSerializer.Deserialize<ResendReceivedEmail>(body, Json)
             ?? throw new InvalidOperationException("Resend returned an empty received-email response.");
     }
