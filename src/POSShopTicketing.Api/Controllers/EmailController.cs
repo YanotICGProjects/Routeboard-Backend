@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;          // SendEmailRequest
@@ -65,10 +66,11 @@ public class EmailController : ControllerBase
     }
 
     /// <summary>Sends straight through Resend, to check the Resend key and domain. Shows the real error on failure.</summary>
+    [Authorize(Roles = "Owner,Admin,Agent,Manager")]
     [HttpPost("send")]
     public async Task<IActionResult> SendViaResend([FromBody] SendEmailRequest request, CancellationToken ct)
     {
-        if (!_env.IsDevelopment()) return NotFound();
+        //if (!_env.IsDevelopment()) return NotFound();
 
         try
         {
