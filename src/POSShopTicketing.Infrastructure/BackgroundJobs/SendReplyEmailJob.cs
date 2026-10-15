@@ -2,16 +2,28 @@ using Microsoft.EntityFrameworkCore;
 using POSShopTicketing.Application.Common.Interfaces;
 using POSShopTicketing.Application.Common.Models;
 using POSShopTicketing.Application.Tickets.Commands.AddTicketMessage;
+using POSShopTicketing.Domain.Entities;
 using POSShopTicketing.Infrastructure.Persistence;
 
 namespace POSShopTicketing.Infrastructure.BackgroundJobs;
 
 /// <summary>
-/// Hangfire-invoked: "Background jobs ... for ... the outbound send
-/// queue" per the spec's architecture section - keeps the request path
-/// for POST /tickets/{id}/messages fast, and Hangfire retries this
-/// safely on failure instead of losing the reply if the email provider
-/// has a blip.
+/// REPLACES Infrastructure/BackgroundJobs/SendReplyEmailJob.cs (the whole file).
+///
+/// Hangfire-invoked: sends an agent's reply in the background so the request stays fast, and
+/// Hangfire retries on failure.
+///
+/// WHAT WAS WRONG BEFORE
+/// The old code set the Reply-To to  ticket+{ticketId}@mail.posshopticketing.app.
+/// That domain has no MX record pointing at your email provider, so when a customer hit
+/// "Reply", their answer went nowhere and never became a message on the ticket.
+///
+/// WHAT IT DOES NOW
+/// The Reply-To is the workspace address the ticket arrived on (for example
+/// acme@support.routeboard.online). That address IS on your catch-all domain, so the customer's
+/// reply goes: customer -> Resend MX -> your webhook -> inbound handler, which finds the workspace
+/// from that address and threads the message into the ticket (In-Reply-To header, or the
+/// [TICKET-NUMBER] in the subject as a fallback).
 /// </summary>
 public class SendReplyEmailJob : ISendReplyEmailJob
 {
@@ -38,11 +50,54 @@ public class SendReplyEmailJob : ISendReplyEmailJob
             return;
         }
 
+        var replyAddress = await ResolveReplyAddressAsync(message.Ticket, cancellationToken);
+
         await _emailSender.SendReplyAsync(
             new OutboundEmailMessage(
                 toEmail, toName,
-                FromAlias: $"ticket+{message.Ticket.Id}@mail.posshopticketing.app",
+                FromAlias: replyAddress,
                 subject, bodyHtml, inReplyToMessageId, generatedMessageId),
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Which address should the customer's reply go to? Tried in this order:
+    ///   1. the mailbox this ticket originally arrived on
+    ///   2. the workspace's default verified mailbox   (tickets created manually have no mailbox)
+    ///   3. the workspace's own support address
+    /// </summary>
+    private async Task<string> ResolveReplyAddressAsync(Ticket ticket, CancellationToken ct)
+    {
+        var mailboxId = ticket.MailboxId;
+
+        var arrivedOn = await _context.Mailboxes
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(m => m.Id == mailboxId)
+            .Select(m => m.EmailAddress)
+            .FirstOrDefaultAsync(ct);
+
+        if (!string.IsNullOrWhiteSpace(arrivedOn)) return arrivedOn;
+
+        var defaultMailbox = await _context.Mailboxes
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(m => m.TenantId == ticket.TenantId && m.IsVerified && m.IsDefault)
+            .Select(m => m.EmailAddress)
+            .FirstOrDefaultAsync(ct);
+
+        if (!string.IsNullOrWhiteSpace(defaultMailbox)) return defaultMailbox;
+
+        var supportEmail = await _context.Tenants
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(t => t.Id == ticket.TenantId)
+            .Select(t => t.SupportEmail)
+            .FirstOrDefaultAsync(ct);
+
+        return !string.IsNullOrWhiteSpace(supportEmail)
+            ? supportEmail
+            : throw new InvalidOperationException(
+                $"No reply address found for ticket {ticket.Id}: it has no mailbox and the tenant has no support email.");
     }
 }

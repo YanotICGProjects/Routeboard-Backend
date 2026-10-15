@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using POSShopTicketing.Application.Common.Interfaces;
 using POSShopTicketing.Infrastructure.BackgroundJobs;
+using POSShopTicketing.Infrastructure.Email;          // NEW: AddEmail / AddResendInbound
 using POSShopTicketing.Infrastructure.Identity;
 using POSShopTicketing.Infrastructure.Persistence;
 using POSShopTicketing.Infrastructure.Persistence.Interceptors;
@@ -13,6 +14,9 @@ using POSShopTicketing.Infrastructure.Storage;
 
 namespace POSShopTicketing.Infrastructure;
 
+// REPLACES Infrastructure/DependencyInjection.cs (the whole file).
+// The only change is the "Outbound email" block: the old if/else that picked SmtpEmailSender or
+// EmailSender is gone, replaced by two calls that set up everything email-related in one place.
 public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
@@ -43,26 +47,22 @@ public static class DependencyInjection
         services.AddScoped<ITicketPriorityClassifier, TicketPriorityClassifier>();
         services.AddScoped<IAlertNotifier, AlertNotifier>();
         services.AddScoped<IHtmlSanitizerService, HtmlSanitizerService>();
-        services.Configure<AttachmentStorageOptions>(
-    configuration.GetSection("Attachments"));
 
-        services.AddScoped<IAttachmentStorage,
-            LocalDiskAttachmentStorage>();
+        // Ticket attachments (files saved from inbound emails). Registered here ONLY -
+        // delete the duplicate lines from Program.cs.
+        services.Configure<AttachmentStorageOptions>(configuration.GetSection("Attachments"));
+        services.AddScoped<IAttachmentStorage, LocalDiskAttachmentStorage>();
 
-        // Outbound email: any SMTP-capable provider once Smtp:Host is
-        // set (Hostinger's own mail hosting, Gmail, Amazon SES, Mailgun,
-        // Postmark, or SendGrid's own SMTP relay) - falls back to the
-        // safe, zero-config log-based sender otherwise.
-        services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
-        var smtpHost = configuration.GetSection(SmtpSettings.SectionName)["Host"];
-        if (!string.IsNullOrWhiteSpace(smtpHost))
-        {
-            services.AddScoped<IEmailSender, SmtpEmailSender>();
-        }
-        else
-        {
-            services.AddScoped<IEmailSender, EmailSender>();
-        }
+        // ---- Outbound email ---------------------------------------------------
+        // Which provider sends what is decided by two settings (see EmailRouting.cs):
+        //     Email:TransactionalProvider   invites, OTPs, audit notices   (default: Smtp = Gmail)
+        //     Email:TicketReplyProvider     replies on a ticket thread     (default: Smtp = Gmail)
+        services.AddEmail(configuration);
+
+        // ---- Inbound email (Resend) -------------------------------------------
+        // Receiving customer emails and turning them into tickets: the webhook settings,
+        // the Resend API client that fetches the email body and attachments, and the adapter.
+        services.AddResendInbound(configuration);
 
         // Activity/audit trail: every login, logout, and ticket
         // operation - persisted to AuditLog always, and emailed to the

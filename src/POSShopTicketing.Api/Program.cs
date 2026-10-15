@@ -6,24 +6,29 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using Newtonsoft.Json.Linq;
 using POSShopTicketing.Api.Middleware;
 using POSShopTicketing.Application;
 using POSShopTicketing.Application.Auth.Common;
 using POSShopTicketing.Application.Common.Interfaces;
 using POSShopTicketing.Infrastructure;
 using POSShopTicketing.Infrastructure.BackgroundJobs;
+using POSShopTicketing.Infrastructure.Email;          // NEW: EmailProviderInfo (for the start-up log line)
 using POSShopTicketing.Infrastructure.Identity;
-using POSShopTicketing.Infrastructure.Inbound;
 using POSShopTicketing.Infrastructure.Persistence;
-using POSShopTicketing.Infrastructure.Storage;
 using Serilog;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+
+// REPLACES Program.cs (the whole file). What changed compared with yours:
+//   1. REMOVED the Resend / attachment registrations from the Services section (they now live in
+//      AddInfrastructure -> AddEmail + AddResendInbound, so each thing is registered exactly once).
+//   2. REMOVED the unused usings (Newtonsoft.Json.Linq, Microsoft.Extensions.Options,
+//      Infrastructure.Inbound, Infrastructure.Storage).
+//   3. ADDED one log line after Build() that prints which provider sends which kind of email.
+// Everything else is exactly as you had it.
 
 // ---- Serilog: one log file per run -------------------------------------
 //
@@ -74,23 +79,8 @@ try
 
     // ---- Services -------------------------------------------------------
 
-    builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Resend"));
-    builder.Services.Configure<AttachmentStorageOptions>(builder.Configuration.GetSection("Attachments"));
-
-    builder.Services.AddHttpClient(ResendReceivingClient.ApiClientName, (sp, http) =>
-    {
-        var o = sp.GetRequiredService<IOptions<ResendOptions>>().Value;
-        http.BaseAddress = new Uri(o.BaseUrl);            // must end with "/"
-        http.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", o.ApiKey);
-        http.Timeout = TimeSpan.FromSeconds(30);
-    });
-    builder.Services.AddHttpClient();                      // plain client used for file downloads
-
-    builder.Services.AddScoped<ResendReceivingClient>();
-    builder.Services.AddScoped<ResendInboundAdapter>();
-    builder.Services.AddSingleton<IAttachmentStorage, LocalDiskAttachmentStorage>();
-
+    // (Resend settings, the Resend HTTP client, the inbound adapter and the attachment storage are
+    //  no longer registered here - AddInfrastructure below does it, once.)
 
     builder.Services
         .AddControllers(options =>
@@ -190,11 +180,11 @@ try
         options.AddPolicy("Default", policy =>
         {
             policy.WithOrigins(
-                    
+
                     "http://localhost:4200",
-                    
+
                     "https://routeboard.online",
-                    
+
                     "https://staging.routeboard.online")
                   .AllowAnyMethod()
                   .AllowAnyHeader();
@@ -202,7 +192,7 @@ try
     });
 
     builder.Services.AddScoped<AuthResultFactory>();
-   
+
 
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
@@ -214,6 +204,13 @@ try
     var app = builder.Build();
     app.UseForwardedHeaders();
 
+    // NEW: say, in the log, which provider sends which kind of email. One look at the console
+    // tells you whether this run is using Gmail SMTP, Resend or the log-only sender.
+    var emailRouting = app.Services.GetRequiredService<EmailProviderInfo>();
+    Log.Information(
+        "Outbound email routing: transactional (invites, OTPs, audit) = {Transactional}; ticket replies = {TicketReply}",
+        emailRouting.Transactional, emailRouting.TicketReply);
+
     // ---- Pipeline ---------------------------------------------------------
 
     // Placed right after the exception middleware so it still sees and
@@ -224,8 +221,8 @@ try
 
     //if (app.Environment.IsDevelopment())
     //{
-        app.UseSwagger();
-    
+    app.UseSwagger();
+
     app.UseSwaggerUI(options =>
     {
         options.RoutePrefix = "swagger";
@@ -234,7 +231,7 @@ try
             "POSShopTicketing API v1");
     });
 
-   // }
+    // }
 
     app.UseHttpsRedirection();
     app.UseCors("Default");
@@ -275,7 +272,7 @@ try
     RecurringJob.AddOrUpdate<SlaBreachRecurringJob>(
         "sla-breach-sweep", job => job.RunAsync(CancellationToken.None), "*/5 * * * *");
 
-    
+
 
     Log.Information("POSShopTicketing API host built - logging this run to {LogFilePath}", logFilePath);
 
