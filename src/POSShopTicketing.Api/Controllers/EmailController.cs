@@ -55,11 +55,13 @@ public class EmailController : ControllerBase
         });
     }
 
+
     /// <summary>Sends through the app's normal path (your Gmail SMTP with default settings).</summary>
+    [Authorize(Roles = "Owner,Admin,Agent,Manager")]
     [HttpPost("send-app")]
     public async Task<IActionResult> SendViaApp([FromBody] SendEmailRequest request, CancellationToken ct)
     {
-        if (!_env.IsDevelopment()) return NotFound();
+        
 
         await _appEmailSender.SendAsync(request.ToEmail, request.ToName, request.Subject, request.Html, ct);
         return Ok(new { sentWith = _routing.Transactional.ToString() });
@@ -75,7 +77,15 @@ public class EmailController : ControllerBase
         try
         {
             var id = await _resend.SendAsync(
-                new OutboundEmail(request.ToEmail, request.ToName, request.Subject, request.Html), ct);
+    new OutboundEmail(
+        ToEmail: request.ToEmail,
+        ToName: request.ToName,
+        Subject: request.Subject,
+        Html: request.Html,
+        FromEmail: request.FromEmail,
+        FromName: request.FromName,
+        ReplyTo: request.ReplyTo),
+    ct);
             return Ok(new { success = true, resendId = id });
         }
         catch (Exception ex)

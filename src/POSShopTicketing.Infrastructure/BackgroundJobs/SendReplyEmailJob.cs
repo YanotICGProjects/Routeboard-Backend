@@ -52,12 +52,24 @@ public class SendReplyEmailJob : ISendReplyEmailJob
 
         var replyAddress = await ResolveReplyAddressAsync(message.Ticket, cancellationToken);
 
+        var tenantName = await _context.Tenants
+    .IgnoreQueryFilters()
+    .Where(x => x.Id == message.Ticket.TenantId)
+    .Select(x => x.Name)
+    .FirstOrDefaultAsync(cancellationToken);
+
         await _emailSender.SendReplyAsync(
-            new OutboundEmailMessage(
-                toEmail, toName,
-                FromAlias: replyAddress,
-                subject, bodyHtml, inReplyToMessageId, generatedMessageId),
-            cancellationToken);
+    new OutboundEmailMessage(
+        ToEmail: toEmail,
+        ToName: toName,
+        FromEmail: replyAddress,
+        FromName: tenantName,
+        FromAlias: replyAddress,
+        Subject: subject,
+        BodyHtml: bodyHtml,
+        InReplyToMessageId: inReplyToMessageId,
+        GeneratedMessageId: generatedMessageId),
+    cancellationToken);
     }
 
     /// <summary>

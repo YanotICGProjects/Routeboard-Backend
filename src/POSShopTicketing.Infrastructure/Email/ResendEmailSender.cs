@@ -99,22 +99,31 @@ public class ResendEmailSender : IEmailSender, IOutboundEmailSender
     ///   - Message-ID  = message.GeneratedMessageId  (we choose it, so we can match replies later)
     ///   - In-Reply-To / References = the customer's previous message, so mail clients thread it
     /// </summary>
-    public async Task SendReplyAsync(OutboundEmailMessage message, CancellationToken cancellationToken)
+    public async Task SendReplyAsync(
+     OutboundEmailMessage message,
+     CancellationToken cancellationToken)
     {
-        // Unlike SendAsync below, a failure here is deliberately NOT swallowed: replies are sent from a
-        // Hangfire job (SendReplyEmailJob), and an exception is what makes Hangfire retry it later.
-        // Retrying can't deliver twice, because the reply's Message-ID doubles as the idempotency key.
-        await SendCoreAsync(new OutboundEmail(
-            ToEmail: message.ToEmail,
-            ToName: message.ToName,
-            Subject: message.Subject,
-            Html: message.BodyHtml,
-            ReplyTo: message.FromAlias,
-            MessageId: message.GeneratedMessageId,
-            InReplyTo: message.InReplyToMessageId,
-            References: message.InReplyToMessageId),
+        await SendCoreAsync(
+            new OutboundEmail(
+                ToEmail: message.ToEmail,
+                ToName: message.ToName,
+
+                FromEmail: message.FromEmail,
+                FromName: message.FromName,
+
+                Subject: message.Subject,
+                Html: message.BodyHtml,
+
+                ReplyTo: message.FromAlias,
+
+                MessageId: message.GeneratedMessageId,
+
+                InReplyTo: message.InReplyToMessageId,
+
+                References: message.InReplyToMessageId),
             cancellationToken);
     }
+
 
     /// <summary>Any other transactional email (invites, audit notices, OTPs): no threading headers.</summary>
     public Task SendAsync(string toEmail, string? toName, string subject, string bodyHtml, CancellationToken cancellationToken) =>
