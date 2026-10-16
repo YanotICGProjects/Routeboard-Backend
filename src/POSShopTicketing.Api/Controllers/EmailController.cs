@@ -1,97 +1,94 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;          // SendEmailRequest
+using Microsoft.Extensions.Logging;
+using POSShopTicketing.Api.Models.Email;
 using POSShopTicketing.Application.Common.Interfaces;
 using POSShopTicketing.Domain.Entities;
-using POSShopTicketing.Infrastructure.Email;      // IOutboundEmailSender, OutboundEmail, EmailProviderInfo
+using POSShopTicketing.Infrastructure.Email;      // EmailSendException
+using POSShopTicketing.Shared.Wrappers;
 
 namespace POSShopTicketing.Api.Controllers;
 
-// REPLACES Controllers/EmailController.cs (the whole file).
-// Every endpoint is Development-only. Without that guard, anyone on the internet could
-// use these to send email from your accounts.
+/// <summary>
+/// REPLACES Controllers/EmailController.cs (the whole file).
+///
+/// POST /api/email/send - the one endpoint that emails a customer about a ticket.
+///
+///   - messageTicketId is REQUIRED and the ticket must already exist. This endpoint never creates a ticket.
+///   - kind "Notice"       an automatic no-reply message           (from no-reply__{workspace}@support...)
+///   - kind "Conversation" an agent's message in the ticket thread (from the workspace address)
+///   - the response returns the mailbox that was used and the thread ids (see TicketEmailResult)
+///
+/// The old free-form test endpoints (send anything to anyone, /provider, /send-app) are removed on purpose:
+/// within the application every email must be tied to a ticket.
+/// </summary>
 [ApiController]
 [Route("api/email")]
+[Authorize(Roles = "Owner,Admin,Manager,Agent")]   // must match the role names in your TeamMemberRole enum
 public class EmailController : ControllerBase
 {
-    private readonly IEmailSender _appEmailSender;        // the router: what the app REALLY uses
-    private readonly IOutboundEmailSender _resend;        // always Resend, for testing the Resend key
-    private readonly EmailProviderInfo _routing;
-    private readonly IWebHostEnvironment _env;
+    private readonly ITicketEmailService _ticketEmail;
     private readonly ILogger<EmailController> _logger;
 
-    public EmailController(
-        IEmailSender appEmailSender,
-        IOutboundEmailSender resend,
-        EmailProviderInfo routing,
-        IWebHostEnvironment env,
-        ILogger<EmailController> logger)
+    public EmailController(ITicketEmailService ticketEmail, ILogger<EmailController> logger)
     {
-        _appEmailSender = appEmailSender;
-        _resend = resend;
-        _routing = routing;
-        _env = env;
+        _ticketEmail = ticketEmail;
         _logger = logger;
     }
 
-    /// <summary>
-    /// THE CHECK:  GET /api/email/provider
-    /// With the default settings you should see Smtp for both. If you ever see Resend for
-    /// "transactional" when you didn't mean to, the Email:TransactionalProvider setting says so.
-    /// </summary>
-    [HttpGet("provider")]
-    public IActionResult Provider()
-    {
-        if (!_env.IsDevelopment()) return NotFound();
-
-        return Ok(new
-        {
-            environment = _env.EnvironmentName,
-            transactional = _routing.Transactional.ToString(),   // invites, OTPs, audit emails
-            ticketReply = _routing.TicketReply.ToString(),       // replies on a ticket thread
-            emailSender = _appEmailSender.GetType().Name         // always "RoutingEmailSender"
-        });
-    }
-
-
-    /// <summary>Sends through the app's normal path (your Gmail SMTP with default settings).</summary>
-    [Authorize(Roles = "Owner,Admin,Agent,Manager")]
-    [HttpPost("send-app")]
-    public async Task<IActionResult> SendViaApp([FromBody] SendEmailRequest request, CancellationToken ct)
-    {
-        
-
-        await _appEmailSender.SendAsync(request.ToEmail, request.ToName, request.Subject, request.Html, ct);
-        return Ok(new { sentWith = _routing.Transactional.ToString() });
-    }
-
-    /// <summary>Sends straight through Resend, to check the Resend key and domain. Shows the real error on failure.</summary>
-    [Authorize(Roles = "Owner,Admin,Agent,Manager")]
     [HttpPost("send")]
-    public async Task<IActionResult> SendViaResend([FromBody] SendEmailRequest request, CancellationToken ct)
+    public async Task<IActionResult> Send([FromBody] SendEmailRequest request, CancellationToken ct)
     {
-        //if (!_env.IsDevelopment()) return NotFound();
+        // "" (what the frontend sends when there is no mailbox) and a missing value both mean "no mailbox given".
+        Guid? mailboxId = null;
+        if (!string.IsNullOrWhiteSpace(request.MailboxId))
+        {
+            if (!Guid.TryParse(request.MailboxId, out var parsed))
+            {
+                return BadRequest(Fail("mailboxId must be a valid GUID, or empty."));
+            }
+
+            mailboxId = parsed;
+        }
+
+        // Explicit "type" wins. Otherwise: a no-reply sender address means an automatic notice.
+        var kind = request.Type ?? (LooksLikeNoReply(request.FromEmail)
+            ? TicketEmailKind.Notice
+            : TicketEmailKind.Conversation);
 
         try
         {
-            var id = await _resend.SendAsync(
-    new OutboundEmail(
-        ToEmail: request.ToEmail,
-        ToName: request.ToName,
-        Subject: request.Subject,
-        Html: request.Html,
-        FromEmail: request.FromEmail,
-        FromName: request.FromName,
-        ReplyTo: request.ReplyTo),
-    ct);
-            return Ok(new { success = true, resendId = id });
+            var result = await _ticketEmail.SendAsync(new TicketEmailRequest(
+                TicketNumber: request.MessageTicketId,
+                Kind: kind,
+                ToEmail: request.ToEmail,
+                ToName: request.ToName,
+                Subject: request.Subject,
+                Html: request.Html,
+                FromEmail: request.FromEmail,
+                FromName: request.FromName,
+                MailboxId: mailboxId), ct);
+
+            return Ok(ApiResponse<TicketEmailResult>.Success(
+                result,
+                kind == TicketEmailKind.Notice ? "Notice sent." : "Message sent to the customer."));
         }
-        catch (Exception ex)
+        catch (EmailSendException ex)
         {
-            _logger.LogError(ex, "Resend test send failed");
-            return StatusCode(500, new { success = false, error = ex.Message });
+            // Not the caller's fault: the email provider refused the message. (Rule violations - unknown ticket,
+            // wrong recipient, bad sender - are NotFoundException / DomainException and are turned into
+            // 404 / 400 by your ExceptionHandlingMiddleware.)
+            _logger.LogError(ex, "Resend refused the email for ticket {Ticket}", request.MessageTicketId);
+            return StatusCode(502, Fail("The email provider could not send the message.", ex.Message));
         }
     }
+
+    private static bool LooksLikeNoReply(string? fromEmail) =>
+        !string.IsNullOrWhiteSpace(fromEmail) &&
+        (fromEmail.TrimStart().StartsWith("no-reply", StringComparison.OrdinalIgnoreCase) ||
+         fromEmail.TrimStart().StartsWith("noreply", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Same JSON shape as your ApiResponse (succeeded / message / errors / data).</summary>
+    private static object Fail(string message, params string[] errors) =>
+        new { succeeded = false, message, errors, data = (object?)null };
 }

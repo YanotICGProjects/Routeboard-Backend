@@ -309,8 +309,8 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
                     request.Attachments,
                     ct);
 
-                if (isNewTicket)
-                {
+                if (isNewTicket && contact is not null)
+            {
                     await _notificationEmailService.SendAutoReplyAsync(
                         senderEmail,
                         senderName,

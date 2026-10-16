@@ -133,7 +133,7 @@ public class ResendEmailSender : IEmailSender, IOutboundEmailSender
                 ToName: toName,
                 Subject: subject,
                 Html: bodyHtml,
-                FromEmail: "noreply@support.routeboard.online",
+                FromEmail: "no-reply@support.routeboard.online",
                 FromName: "RouteBoard Support",
                 ReplyTo: replyTo),
             cancellationToken);

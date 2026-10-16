@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using POSShopTicketing.Application.Common.Interfaces;
+using POSShopTicketing.Application.Common.Services;
 using POSShopTicketing.Infrastructure.BackgroundJobs;
 using POSShopTicketing.Infrastructure.Email;          // NEW: AddEmail / AddResendInbound
 using POSShopTicketing.Infrastructure.Identity;
@@ -101,8 +102,10 @@ public static class DependencyInjection
         services.AddHangfireServer();
 
         services.AddScoped<IBackgroundJobScheduler, BackgroundJobScheduler>();
-        services.AddScoped<POSShopTicketing.Application.Tickets.Commands.AddTicketMessage.ISendReplyEmailJob, SendReplyEmailJob>();
+        //services.AddScoped<POSShopTicketing.Application.Tickets.Commands.AddTicketMessage.ISendReplyEmailJob, SendReplyEmailJob>();
         services.AddScoped<SlaBreachRecurringJob>();
+        services.AddScoped<ITicketEmailService, TicketEmailService>();
+        services.AddScoped<INotificationEmailService, NotificationEmailService>();
 
         return services;
     }
