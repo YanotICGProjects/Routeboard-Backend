@@ -111,17 +111,17 @@ public class TicketsController : ApiControllerBase
 
 
 
-    [HttpGet("{ticketNumber}/conversation")]
-    public async Task<IActionResult> GetConversation(
-    string ticketNumber,
-    CancellationToken ct)
-    {
-        var result = await Mediator.Send(
-            new GetTicketConversationQuery(ticketNumber),
-            ct);
+    //[HttpGet("{ticketNumber}/conversation")]
+    //public async Task<IActionResult> GetConversation(
+    //string ticketNumber,
+    //CancellationToken ct)
+    //{
+    //    var result = await Mediator.Send(
+    //        new GetTicketConversationQuery(ticketNumber),
+    //        ct);
 
-        return Ok(result);
-    }
+    //    return Ok(result);
+    //}
 
     [HttpGet("{ticketNumber}/thread")]
     public async Task<IActionResult> GetThread(

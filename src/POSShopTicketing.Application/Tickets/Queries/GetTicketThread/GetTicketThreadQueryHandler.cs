@@ -25,10 +25,10 @@ public class GetTicketThreadQueryHandler
         CancellationToken cancellationToken)
     {
         var ticket = await _context.Tickets
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.TicketNumber == request.TicketNumber,
-                cancellationToken);
+    .Include(x => x.Mailbox)
+    .FirstOrDefaultAsync(
+        x => x.TicketNumber == request.TicketNumber,
+        cancellationToken);
 
         if (ticket == null)
         {
@@ -50,6 +50,11 @@ public class GetTicketThreadQueryHandler
             TicketId = ticket.Id,
             TicketNumber = ticket.TicketNumber,
             Subject = ticket.Subject,
+
+            MailboxId = ticket.MailboxId,
+            MailboxAddress = ticket.Mailbox?.EmailAddress,
+
+            IsEmailTicket = ticket.MailboxId != null,
 
             Messages = messages.Select(x =>
                 new TicketConversationDto
