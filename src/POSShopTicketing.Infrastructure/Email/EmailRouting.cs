@@ -152,6 +152,22 @@ public class RoutingEmailSender : IEmailSender
         _routing = routing;
     }
 
+    public Task SendAutoReplyAsync(
+    string toEmail,
+    string? toName,
+    string subject,
+    string bodyHtml,
+    string replyTo,
+    CancellationToken cancellationToken)
+    {
+        return SendAsync(
+            toEmail,
+            toName,
+            subject,
+            bodyHtml,
+            cancellationToken);
+    }
+
     /// <summary>A reply on a ticket thread - goes to whichever provider TicketReplyProvider names.</summary>
     public Task SendReplyAsync(OutboundEmailMessage message, CancellationToken cancellationToken) =>
         Pick(_routing.TicketReply).SendReplyAsync(message, cancellationToken);

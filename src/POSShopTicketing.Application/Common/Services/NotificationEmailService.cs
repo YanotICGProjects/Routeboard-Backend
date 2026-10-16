@@ -1,4 +1,5 @@
 ﻿using POSShopTicketing.Application.Common.Interfaces;
+using POSShopTicketing.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -102,16 +103,14 @@ namespace POSShopTicketing.Application.Common.Services
     string? customerName,
     string ticketNumber,
     string subject,
+    string replyTo,
     CancellationToken ct)
         {
             var html = $"""
     <h2>We've Received Your Message</h2>
 
-    <p>Hello {(string.IsNullOrWhiteSpace(customerName) ? "Customer" : customerName)},</p>
-
     <p>
         Thank you for contacting us.
-        Your request has been received and a support ticket has been created.
     </p>
 
     <p>
@@ -125,20 +124,24 @@ namespace POSShopTicketing.Application.Common.Services
     </p>
 
     <p>
-        Our support team will get back to you shortly.
-    </p>
-
-    <p>
-        Please reply directly to this email if you need to add more information.
+        You can reply directly to this email to add more information.
     </p>
     """;
 
-            await _emailSender.SendAsync(
+            await _emailSender.SendAutoReplyAsync(
                 customerEmail,
                 customerName,
                 $"Re: [{ticketNumber}] {subject}",
                 html,
+                replyTo,
                 ct);
         }
+
+        
+        
+
+
+        
+        
     }
 }

@@ -29,6 +29,22 @@ public class SmtpEmailSender : IEmailSender
         _logger = logger;
     }
 
+    public Task SendAutoReplyAsync(
+    string toEmail,
+    string? toName,
+    string subject,
+    string bodyHtml,
+    string replyTo,
+    CancellationToken cancellationToken)
+    {
+        return SendAsync(
+            toEmail,
+            toName,
+            subject,
+            bodyHtml,
+            cancellationToken);
+    }
+
     public Task SendReplyAsync(OutboundEmailMessage message, CancellationToken cancellationToken)
     {
         var mime = BuildMessage(message.ToEmail, message.ToName, message.Subject, message.BodyHtml);

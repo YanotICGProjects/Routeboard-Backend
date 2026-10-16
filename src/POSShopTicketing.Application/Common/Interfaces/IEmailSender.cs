@@ -21,7 +21,22 @@ namespace POSShopTicketing.Application.Common.Interfaces;
 /// </summary>
 public interface IEmailSender
 {
-    Task SendReplyAsync(OutboundEmailMessage message, CancellationToken cancellationToken);
+    Task SendReplyAsync(
+        OutboundEmailMessage message,
+        CancellationToken cancellationToken);
 
-    Task SendAsync(string toEmail, string? toName, string subject, string bodyHtml, CancellationToken cancellationToken);
+    Task SendAsync(
+        string toEmail,
+        string? toName,
+        string subject,
+        string bodyHtml,
+        CancellationToken cancellationToken);
+
+    Task SendAutoReplyAsync(
+        string toEmail,
+        string? toName,
+        string subject,
+        string bodyHtml,
+        string replyTo,
+        CancellationToken cancellationToken);
 }

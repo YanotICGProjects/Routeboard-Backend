@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using POSShopTicketing.Application.Common.Interfaces;
 using POSShopTicketing.Application.Common.Models;
+using POSShopTicketing.Domain.Entities;
 using POSShopTicketing.Infrastructure.Inbound;
 
 namespace POSShopTicketing.Infrastructure.Email;
@@ -43,26 +44,6 @@ public class ResendSenderOptions
     public string? SendApiKey { get; set; }
 
     public int MaxAttempts { get; set; } = 3;
-}
-
-/// <summary>A provider-neutral outgoing email, used by the test endpoint and internally.</summary>
-public record OutboundEmail(
-    string ToEmail,
-    string? ToName,
-    string Subject,
-    string Html,
-    string? Text = null,
-    string? FromEmail = null,
-    string? FromName = null,
-    string? ReplyTo = null,
-    string? MessageId = null,      // OUR Message-ID (brackets optional)
-    string? InReplyTo = null,
-    string? References = null);
-
-public interface IOutboundEmailSender
-{
-    /// <summary>Sends and THROWS on failure. Returns Resend's email id.</summary>
-    Task<string?> SendAsync(OutboundEmail email, CancellationToken ct);
 }
 
 public class EmailSendException : Exception
@@ -137,6 +118,26 @@ public class ResendEmailSender : IEmailSender, IOutboundEmailSender
     // ------------------------------------------------------------------
     //  Internals
     // ------------------------------------------------------------------
+
+    public Task SendAutoReplyAsync(
+    string toEmail,
+    string? toName,
+    string subject,
+    string bodyHtml,
+    string replyTo,
+    CancellationToken cancellationToken)
+    {
+        return SendCoreAsync(
+            new OutboundEmail(
+                ToEmail: toEmail,
+                ToName: toName,
+                Subject: subject,
+                Html: bodyHtml,
+                FromEmail: "noreply@support.routeboard.online",
+                FromName: "RouteBoard Support",
+                ReplyTo: replyTo),
+            cancellationToken);
+    }
 
     /// <summary>Same contract as SmtpEmailSender: log the failure, never take down the caller.</summary>
     private async Task SendSafelyAsync(OutboundEmail email, CancellationToken ct)

@@ -1,13 +1,14 @@
-using System.Net;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using POSShopTicketing.Application.Common.Interfaces;
+using POSShopTicketing.Application.Common.Services;
 using POSShopTicketing.Application.Tickets.Common;
 using POSShopTicketing.Application.Tickets.Events;
 using POSShopTicketing.Domain.Entities;
 using POSShopTicketing.Domain.Enums;
+using System.Net;
 
 namespace POSShopTicketing.Application.Tickets.Commands.IngestInboundEmail;
 
@@ -83,6 +84,7 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
     private readonly InboundEmailOptions _options;
     private readonly ILogger<IngestInboundEmailCommandHandler> _logger;
     private readonly IAttachmentStorage _attachmentStorage;
+    private readonly INotificationEmailService _notificationEmailService;
 
     public IngestInboundEmailCommandHandler(
         IApplicationDbContext context,
@@ -96,7 +98,8 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
         IPublisher publisher,
         IOptions<InboundEmailOptions> options,
         ILogger<IngestInboundEmailCommandHandler> logger,
-        IAttachmentStorage attachmentStorage)
+        IAttachmentStorage attachmentStorage,
+        INotificationEmailService notificationEmailService)
     {
         _context = context;
         _currentTenantService = currentTenantService;
@@ -110,6 +113,8 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
         _options = options.Value;
         _logger = logger;
         _attachmentStorage = attachmentStorage;
+        _notificationEmailService = notificationEmailService;
+
     }
 
     public async Task<IngestInboundEmailResult> Handle(IngestInboundEmailCommand request, CancellationToken ct)
@@ -294,13 +299,28 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
         // ---- 7. Save (guard against two retries racing each other) --------------
         try
         {
-            await _context.SaveChangesAsync(ct);
-            await SaveAttachmentsAsync(
-    tenantId,
-    ticket.Id,
-    message.Id,
-    request.Attachments,
-    ct);
+            
+                await _context.SaveChangesAsync(ct);
+
+                await SaveAttachmentsAsync(
+                    tenantId,
+                    ticket.Id,
+                    message.Id,
+                    request.Attachments,
+                    ct);
+
+                if (isNewTicket)
+                {
+                    await _notificationEmailService.SendAutoReplyAsync(
+                        senderEmail,
+                        senderName,
+                        ticket.TicketNumber,
+                        ticket.Subject,
+                        mailbox.EmailAddress,
+                        ct);
+                }
+            
+            
         }
         catch (DbUpdateException)
         {
