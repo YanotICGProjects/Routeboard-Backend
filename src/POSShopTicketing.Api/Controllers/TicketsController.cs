@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using POSShopTicketing.Application.Common.Interfaces;
 using POSShopTicketing.Application.Tickets.Commands.AddTicketMessage;
 using POSShopTicketing.Application.Tickets.Commands.ChangeTicketAssignee;
@@ -13,9 +14,11 @@ using POSShopTicketing.Application.Tickets.Commands.Triage.RegisterTriageTicket;
 using POSShopTicketing.Application.Tickets.Commands.Triage.RejectTriageTicket;
 using POSShopTicketing.Application.Tickets.Queries.GetSlaBreachedTickets;
 using POSShopTicketing.Application.Tickets.Queries.GetTicketById;
+using POSShopTicketing.Application.Tickets.Queries.GetTicketConversation;
 using POSShopTicketing.Application.Tickets.Queries.GetTicketMessages;
 using POSShopTicketing.Application.Tickets.Queries.GetTickets;
 using POSShopTicketing.Application.Tickets.Queries.GetTicketStatusHistory;
+using POSShopTicketing.Application.Tickets.Queries.GetTicketThread;
 using POSShopTicketing.Application.Tickets.Queries.GetTriageQueue;
 using POSShopTicketing.Domain.Enums;
 using POSShopTicketing.Shared.Wrappers;
@@ -104,6 +107,32 @@ public class TicketsController : ApiControllerBase
         var id = await Mediator.Send(command);
         var response = ApiResponse<Guid>.Success(id, "Ticket created.");
         return CreatedAtAction(nameof(GetTicket), new { id }, response);
+    }
+
+
+
+    [HttpGet("{ticketNumber}/conversation")]
+    public async Task<IActionResult> GetConversation(
+    string ticketNumber,
+    CancellationToken ct)
+    {
+        var result = await Mediator.Send(
+            new GetTicketConversationQuery(ticketNumber),
+            ct);
+
+        return Ok(result);
+    }
+
+    [HttpGet("{ticketNumber}/thread")]
+    public async Task<IActionResult> GetThread(
+    string ticketNumber,
+    CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(
+            new GetTicketThreadQuery(ticketNumber),
+            cancellationToken);
+
+        return Ok(result);
     }
 
     [HttpPatch("{id:guid}/status")]
