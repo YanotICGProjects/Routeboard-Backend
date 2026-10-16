@@ -102,5 +102,7 @@ public class TicketCreatedEventHandler : INotificationHandler<TicketCreatedEvent
                 </p>
             </div>",
             cancellationToken);
+
+
     }
 }

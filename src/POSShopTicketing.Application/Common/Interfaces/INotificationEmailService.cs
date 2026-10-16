@@ -26,5 +26,12 @@ namespace POSShopTicketing.Application.Common.Interfaces
             string ticketNumber,
             string subject,
             CancellationToken ct);
+
+        Task SendAutoReplyAsync(
+    string customerEmail,
+    string? customerName,
+    string ticketNumber,
+    string subject,
+    CancellationToken ct);
     }
 }

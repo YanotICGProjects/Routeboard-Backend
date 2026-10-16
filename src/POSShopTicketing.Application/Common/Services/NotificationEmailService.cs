@@ -96,5 +96,49 @@ namespace POSShopTicketing.Application.Common.Services
                 html,
                 ct);
         }
+
+        public async Task SendAutoReplyAsync(
+    string customerEmail,
+    string? customerName,
+    string ticketNumber,
+    string subject,
+    CancellationToken ct)
+        {
+            var html = $"""
+    <h2>We've Received Your Message</h2>
+
+    <p>Hello {(string.IsNullOrWhiteSpace(customerName) ? "Customer" : customerName)},</p>
+
+    <p>
+        Thank you for contacting us.
+        Your request has been received and a support ticket has been created.
+    </p>
+
+    <p>
+        Ticket Number:
+        <strong>{ticketNumber}</strong>
+    </p>
+
+    <p>
+        Subject:
+        <strong>{subject}</strong>
+    </p>
+
+    <p>
+        Our support team will get back to you shortly.
+    </p>
+
+    <p>
+        Please reply directly to this email if you need to add more information.
+    </p>
+    """;
+
+            await _emailSender.SendAsync(
+                customerEmail,
+                customerName,
+                $"Re: [{ticketNumber}] {subject}",
+                html,
+                ct);
+        }
     }
 }
