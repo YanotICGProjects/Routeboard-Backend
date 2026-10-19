@@ -2,17 +2,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using POSShopTicketing.Application.Common.Interfaces;
+using POSShopTicketing.Application.Tickets.Queries.GetTicketAttachment;
 using POSShopTicketing.Shared.Wrappers;
 
 namespace POSShopTicketing.Api.Controllers
 {
-    public record TicketAttachmentDto(
-        Guid Id,
-        Guid TicketMessageId,
-        string FileName,
-        string ContentType,
-        long SizeBytes,
-        bool IsInline);
+
 
     [ApiController]
     [Authorize]
