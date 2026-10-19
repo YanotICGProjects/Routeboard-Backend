@@ -21,7 +21,7 @@ public static class WorkspaceAliasRules
         "postmaster", "abuse", "hostmaster", "webmaster", "admin", "administrator", "root",
         "security", "mailer-daemon", "noreply", "no-reply", "donotreply", "do-not-reply",
         "support", "billing", "sales", "info", "help", "contact", "ticket", "tickets",
-        "www", "mail", "api", "app", "pos-shop"   // pos-shop = the platform's own support address
+        "www", "mail", "api", "app",   // pos-shop = the platform's own support address
     };
 
     public static bool TryNormalize(string? input, out string alias, out string? error)
