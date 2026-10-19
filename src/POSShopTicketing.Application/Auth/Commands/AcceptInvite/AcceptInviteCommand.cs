@@ -76,7 +76,11 @@ public class AcceptInviteCommandHandler : IRequestHandler<AcceptInviteCommand, A
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        var result = await _authResultFactory.IssueAsync(teamMember, cancellationToken);
+        var tenant = await _context.Tenants
+    .FirstOrDefaultAsync(t => t.Id == teamMember.TenantId, cancellationToken)
+    ?? throw new UnauthorizedException("Tenant not found.");
+
+        var result = await _authResultFactory.IssueAsync(teamMember, tenant, cancellationToken);
 
         await _publisher.Publish(
             new TeamMemberLoggedInEvent(teamMember.TenantId, teamMember.Id, teamMember.Email, teamMember.FullName, teamMember.Role.ToString()),

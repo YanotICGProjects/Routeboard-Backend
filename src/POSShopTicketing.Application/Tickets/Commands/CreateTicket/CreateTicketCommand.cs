@@ -21,6 +21,7 @@ public record CreateTicketCommand : IRequest<Guid>
     public Guid? OrganizationDepartmentId { get; init; }
     public Guid? OrganizationContactId { get; init; }
     public bool Escalated { get; init; }
+    public bool isSendToCustomer { get; init; }
     public TicketStatus Status { get; init; }
     public TicketPriority? Priority { get; init; }
 
@@ -133,7 +134,7 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
         {
             TenantId = tenantId,
             TicketId = ticket.Id,
-            Direction = MessageDirection.Inbound,
+            Direction = request.isSendToCustomer ? MessageDirection.Outbound : MessageDirection.InternalNote,
             AuthorType = contact is not null ? MessageAuthorType.OrganizationContact : MessageAuthorType.TeamMember,
             AuthorTeamMemberId = contact is null ? _currentUserService.TeamMemberId : null,
             AuthorEmail = contact?.Email,
@@ -167,14 +168,16 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
 
         // Always publish TicketCreatedEvent
         await _publisher.Publish(
-            new TicketCreatedEvent(
-                tenantId,
-                ticket.Id,
-                ticket.TicketNumber,
-                ticket.Subject,
-                IsUnverified: false),
-            cancellationToken);
-
+    new TicketCreatedEvent(
+        tenantId,
+        ticket.Id,
+        ticket.TicketNumber,
+        ticket.Subject,
+        request.isSendToCustomer
+            ? request.InitialMessageBody
+            : null,
+        IsUnverified: false),
+    cancellationToken);
         // Publish assignment event only when assigned
         // to someone other than the creator.
         if (ticket.AssignedToTeamMemberId.HasValue &&

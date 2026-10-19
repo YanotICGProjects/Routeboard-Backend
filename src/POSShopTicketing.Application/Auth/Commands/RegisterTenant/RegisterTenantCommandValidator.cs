@@ -25,6 +25,10 @@ public class RegisterTenantCommandValidator : AbstractValidator<RegisterTenantCo
             .WithMessage("Password must be at least 8 characters.")
             .MaximumLength(100);
 
+        RuleFor(v => v.WorkSpaceName)
+            .NotEmpty()
+            .MaximumLength(100);
+
         RuleFor(v => v.OwnerFirstName)
             .NotEmpty()
             .MaximumLength(100);

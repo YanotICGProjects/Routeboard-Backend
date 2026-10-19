@@ -32,6 +32,7 @@ public record RegisterTenantCommand : IRequest<AuthResultDto>
     public string OwnerPassword { get; init; } = string.Empty;
     public string OwnerFirstName { get; init; } = string.Empty;
     public string OwnerLastName { get; init; } = string.Empty;
+    public string WorkSpaceName { get; init; } = string.Empty;
     public string WorkspaceAlias { get; init; } = string.Empty;
     public string WorkspaceDomain { get; init; } = string.Empty;
     public string VerificationToken { get; init; } = string.Empty;
@@ -136,7 +137,8 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
             Status = TenantStatus.Active,
             WorkspaceAlias = alias,
             SupportEmail = workspaceEmail,
-            WorkspaceDomain = request.WorkspaceDomain
+            WorkspaceDomain = request.WorkspaceDomain,
+            WorkSpaceName = request.WorkSpaceName
         };
 
 
@@ -246,7 +248,7 @@ public class RegisterTenantCommandHandler : IRequestHandler<RegisterTenantComman
         _context.TeamMembers.Add(owner);
         await _context.SaveChangesAsync(cancellationToken);
 
-        var result = await _authResultFactory.IssueAsync(owner, cancellationToken);
+        var result = await _authResultFactory.IssueAsync(owner, tenant, cancellationToken);
 
         await _publisher.Publish(
             new TeamMemberLoggedInEvent(tenant.Id, owner.Id, owner.Email, owner.FullName, owner.Role.ToString()),

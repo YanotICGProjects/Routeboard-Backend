@@ -23,10 +23,9 @@ public class TicketCreatedEventHandler : INotificationHandler<TicketCreatedEvent
     }
 
     public async Task Handle(
-        TicketCreatedEvent notification,
-        CancellationToken cancellationToken)
+    TicketCreatedEvent notification,
+    CancellationToken cancellationToken)
     {
-        // Existing RouteBoard notification
         await _alertNotifier.NotifyAsync(
             new AlertMessage(
                 NotificationType.Other,
@@ -49,60 +48,75 @@ public class TicketCreatedEventHandler : INotificationHandler<TicketCreatedEvent
             return;
         }
 
-        // Email only for unassigned tickets
-        if (ticket.AssignedToTeamMemberId.HasValue)
+        //
+        // INTERNAL EMAIL TO CREATOR
+        //
+        if (!ticket.AssignedToTeamMemberId.HasValue)
         {
-            return;
+            var creator = await _context.TeamMembers
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.Id == ticket.CreatorId,
+                    cancellationToken);
+
+            if (creator is not null &&
+                !string.IsNullOrWhiteSpace(creator.Email))
+            {
+                await _emailSender.SendAsync(
+                    creator.Email,
+                    creator.FullName,
+                    $"Ticket {ticket.TicketNumber} Created",
+                    $"""
+                <div style="font-family:Arial,sans-serif;font-size:14px;">
+                    <p>Hello {creator.FullName},</p>
+
+                    <p>
+                        Your ticket has been created successfully.
+                    </p>
+
+                    <p>
+                        <strong>Ticket Number:</strong>
+                        {ticket.TicketNumber}
+                    </p>
+
+                    <p>
+                        <strong>Subject:</strong>
+                        {ticket.Subject}
+                    </p>
+
+                    <p>
+                        This ticket is awaiting assignment.
+                    </p>
+                </div>
+                """,
+                    cancellationToken);
+            }
         }
 
-        var creator = await _context.TeamMembers
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.Id == ticket.CreatorId,
+        //
+        // CUSTOMER EMAIL
+        //
+        if (!string.IsNullOrWhiteSpace(notification.CustomerEmailBody))
+        {
+            var contact = await _context.OrganizationContacts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.Id == ticket.OrganizationContactId,
+                    cancellationToken);
+
+            if (contact is null ||
+                string.IsNullOrWhiteSpace(contact.Email))
+            {
+                return;
+            }
+
+            await _emailSender.SendAsync(
+                contact.Email,
+                contact.FullName,
+                $"[{ticket.TicketNumber}] {ticket.Subject}",
+                notification.CustomerEmailBody,
                 cancellationToken);
-
-        if (creator is null || string.IsNullOrWhiteSpace(creator.Email))
-        {
-            return;
         }
-
-        await _emailSender.SendAsync(
-            creator.Email,
-            creator.FullName,
-            $"Ticket {ticket.TicketNumber} Created",
-            $@"
-            <div style='font-family:Arial,sans-serif;font-size:14px;line-height:1.6'>
-                <p>Hello {creator.FullName},</p>
-
-                <p>
-                    Your ticket has been created successfully in RouteBoard.
-                </p>
-
-                <p>
-                    <strong>Ticket Number:</strong>
-                    {ticket.TicketNumber}
-                </p>
-
-                <p>
-                    <strong>Subject:</strong>
-                    {ticket.Subject}
-                </p>
-
-                <p>
-                    This ticket is currently awaiting assignment.
-                </p>
-
-                <p>
-                    You will receive further updates when a team member is assigned.
-                </p>
-
-                <p>
-                    Thank you.
-                </p>
-            </div>",
-            cancellationToken);
-
-
     }
 }

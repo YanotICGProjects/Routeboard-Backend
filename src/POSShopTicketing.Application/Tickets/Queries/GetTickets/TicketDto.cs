@@ -12,6 +12,7 @@ public class TicketDto
     public TicketPriority Priority { get; init; }
     public TicketSource Source { get; init; }
     public bool Escalated { get; init; }
+    public bool isSendToCustomer { get; init; }
     public Guid? MailboxId { get; init; }
     public Guid? OrganizationId { get; init; }
     public string? OrganizationName { get; init; }
@@ -45,6 +46,7 @@ public class TicketDto
         Priority = entity.Priority,
         Source = entity.Source,
         Escalated = entity.Escalated,
+        isSendToCustomer = entity.isSendToCustomer,
         MailboxId = entity.MailboxId,
         OrganizationId = entity.OrganizationId,
         OrganizationName = entity.Organization?.Name,

@@ -100,6 +100,14 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, A
         // AuthResultFactory would issue yet another new refresh token on
         // top of the one just minted above - instead build the result
         // directly here so exactly one new refresh token comes back.
-        return await _authResultFactory.IssueAccessTokenOnlyAsync(teamMember, newPlainTextToken, newExpiresAt);
+        var tenant = await _context.Tenants
+    .FirstOrDefaultAsync(t => t.Id == teamMember.TenantId, cancellationToken)
+    ?? throw new UnauthorizedException("Tenant not found.");
+
+        return await _authResultFactory.IssueAccessTokenOnlyAsync(
+            teamMember,
+            tenant,
+            newPlainTextToken,
+            newExpiresAt);
     }
 }

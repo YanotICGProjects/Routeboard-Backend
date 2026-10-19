@@ -28,7 +28,7 @@ public class AuthResultFactory
         _dateTime = dateTime;
     }
 
-    public async Task<AuthResultDto> IssueAsync(TeamMember teamMember, CancellationToken cancellationToken)
+    public async Task<AuthResultDto> IssueAsync(TeamMember teamMember, Tenant tenant, CancellationToken cancellationToken)
     {
         var (accessToken, accessTokenExpiresAt) = _jwtTokenGenerator.GenerateAccessToken(teamMember);
         var (plainTextRefreshToken, refreshTokenHash, refreshTokenExpiresAt) = _refreshTokenService.GenerateToken();
@@ -43,7 +43,7 @@ public class AuthResultFactory
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return BuildDto(teamMember, accessToken, accessTokenExpiresAt, plainTextRefreshToken, refreshTokenExpiresAt);
+        return BuildDto(teamMember, tenant, accessToken, accessTokenExpiresAt, plainTextRefreshToken, refreshTokenExpiresAt);
     }
 
     /// <summary>Used only by RefreshTokenCommandHandler, which has
@@ -52,16 +52,17 @@ public class AuthResultFactory
     /// access token and assembles the response DTO around both, without
     /// creating a second refresh token.</summary>
     public Task<AuthResultDto> IssueAccessTokenOnlyAsync(
-        TeamMember teamMember, string newPlainTextRefreshToken, DateTime refreshTokenExpiresAt)
+        TeamMember teamMember, Tenant tenant, string newPlainTextRefreshToken, DateTime refreshTokenExpiresAt)
     {
         var (accessToken, accessTokenExpiresAt) = _jwtTokenGenerator.GenerateAccessToken(teamMember);
 
         return Task.FromResult(
-            BuildDto(teamMember, accessToken, accessTokenExpiresAt, newPlainTextRefreshToken, refreshTokenExpiresAt));
+            BuildDto(teamMember, tenant, accessToken, accessTokenExpiresAt, newPlainTextRefreshToken, refreshTokenExpiresAt));
     }
 
     private static AuthResultDto BuildDto(
         TeamMember teamMember,
+        Tenant tenant,
         string accessToken,
         DateTime accessTokenExpiresAt,
         string refreshToken,
@@ -73,6 +74,8 @@ public class AuthResultFactory
         FirstName = teamMember.FirstName,
         LastName = teamMember.LastName,
         Role = teamMember.Role,
+        WorkSpaceName = tenant.WorkSpaceName,
+        SupportEmail = tenant.SupportEmail,
         AccessToken = accessToken,
         AccessTokenExpiresAt = accessTokenExpiresAt,
         RefreshToken = refreshToken,

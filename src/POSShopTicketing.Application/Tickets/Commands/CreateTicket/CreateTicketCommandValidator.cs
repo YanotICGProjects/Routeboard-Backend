@@ -20,6 +20,15 @@ public class CreateTicketCommandValidator : AbstractValidator<CreateTicketComman
         RuleFor(v => v.InitialMessageBody)
             .NotEmpty()
             .MaximumLength(8000);
+        RuleFor(x => x.OrganizationContactId)
+    .NotNull()
+    .When(x => x.isSendToCustomer)
+    .WithMessage("An organization contact must be selected when sending an email to a customer.");
+
+        RuleFor(x => x)
+            .MustAsync(HaveContactWithEmail)
+            .When(x => x.isSendToCustomer)
+            .WithMessage("The selected contact does not have a valid email address.");
 
         RuleFor(v => v.Priority!.Value)
             .IsInEnum()
@@ -45,6 +54,22 @@ public class CreateTicketCommandValidator : AbstractValidator<CreateTicketComman
             .When(v => v.OrganizationDepartmentId.HasValue)
             .WithMessage("Organization department is suspended.");
     }
+
+    private async Task<bool> HaveContactWithEmail(
+    CreateTicketCommand command,
+    CancellationToken cancellationToken)
+    {
+        if (!command.OrganizationContactId.HasValue)
+            return false;
+
+        return await _context.OrganizationContacts
+            .AnyAsync(
+                x => x.Id == command.OrganizationContactId.Value
+                     && x.Status == OrganizationContactStatus.Active
+                     && !string.IsNullOrWhiteSpace(x.Email),
+                cancellationToken);
+    }
+
 
     private async Task<bool> BeAnActiveTeamMember(
         Guid? teamMemberId,

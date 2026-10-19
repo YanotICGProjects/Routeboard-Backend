@@ -694,6 +694,10 @@ namespace POSShopTicketing.Infrastructure.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
+                    b.Property<string>("WorkSpaceName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("WorkspaceAlias")
                         .IsRequired()
                         .HasColumnType("text");
@@ -807,6 +811,9 @@ namespace POSShopTicketing.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<bool>("isSendToCustomer")
+                        .HasColumnType("boolean");
 
                     b.HasKey("Id");
 

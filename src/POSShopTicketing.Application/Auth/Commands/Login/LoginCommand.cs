@@ -49,7 +49,11 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResultDto>
             throw new UnauthorizedException("Invalid email or password.");
         }
 
-        var result = await _authResultFactory.IssueAsync(teamMember, cancellationToken);
+        var tenant = await _context.Tenants
+    .FirstOrDefaultAsync(t => t.Id == teamMember.TenantId, cancellationToken)
+    ?? throw new UnauthorizedException("Tenant not found.");
+
+        var result = await _authResultFactory.IssueAsync(teamMember, tenant, cancellationToken);
 
         await _publisher.Publish(
             new TeamMemberLoggedInEvent(result.TenantId, teamMember.Id, teamMember.Email, teamMember.FullName, teamMember.Role.ToString()),

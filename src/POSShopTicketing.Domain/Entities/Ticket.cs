@@ -57,7 +57,7 @@ public class Ticket : BaseAuditableEntity, ITenantScoped
     /// <summary>Manually set for now; SLA-driven automatically once
     /// Phase 5's business-hours engine reads DueAt.</summary>
     public bool Escalated { get; set; }
-
+    public bool isSendToCustomer { get; set; }
     public DateTime? FirstResponseAt { get; set; }
     public DateTime? ResolvedAt { get; set; }
     public DateTime? ClosedAt { get; set; }

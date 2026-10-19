@@ -48,7 +48,7 @@ public class ApplicationDbContextInitializer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while migrating the POSShopTicketing database.");
+            _logger.LogError(ex, "An error occurred while migrating the Routeboard database.");
             throw;
         }
     }

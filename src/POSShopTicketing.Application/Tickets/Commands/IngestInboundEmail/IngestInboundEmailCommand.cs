@@ -335,7 +335,7 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
         if (isNewTicket)
         {
             events.Add(new TicketCreatedEvent(
-                tenantId, ticket.Id, ticket.TicketNumber, ticket.Subject, ticket.Status == TicketStatus.Unverified));
+                tenantId, ticket.Id, ticket.TicketNumber, ticket.Subject,null, ticket.Status == TicketStatus.Unverified));
 
             if (ticket.AssignedToTeamMemberId.HasValue)
             {
