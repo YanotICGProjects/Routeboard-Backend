@@ -90,7 +90,6 @@ public class GetTicketThreadQueryHandler
                         .Where(a => a.TicketMessageId == x.Id)
                         .Select(a => new TicketAttachmentDto(
                             a.Id,
-                            a.TicketMessageId,
                             a.FileName,
                             a.ContentType,
                             a.SizeBytes,

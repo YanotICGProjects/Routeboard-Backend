@@ -6,7 +6,6 @@ namespace POSShopTicketing.Application.Tickets.Queries.GetTicketAttachment
 {
     public record TicketAttachmentDto(
     Guid Id,
-    Guid TicketMessageId,
     string FileName,
     string ContentType,
     long SizeBytes,

@@ -35,7 +35,6 @@ namespace POSShopTicketing.Api.Controllers
                 .OrderBy(a => a.CreatedAt)
                 .Select(a => new TicketAttachmentDto(
                     a.Id,
-                    a.TicketMessageId,
                     a.FileName,
                     a.ContentType,
                     a.SizeBytes,
