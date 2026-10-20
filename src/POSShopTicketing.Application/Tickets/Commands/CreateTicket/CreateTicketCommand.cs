@@ -109,6 +109,8 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
             ContactFirstName = contact?.FirstName ?? string.Empty,
             ContactLastName = contact?.LastName ?? string.Empty,
             RawSenderEmail = contact?.Email ?? string.Empty,
+            TransportationAmount = request.TransportationAmount,
+            TransportationRoute = request.TransportationRoute,
             MailboxId = null,
             Subject = request.Subject.Trim(),
             Status = request.Status,

@@ -7,6 +7,7 @@ using POSShopTicketing.Application.Tickets.Commands.ChangeTicketAssignee;
 using POSShopTicketing.Application.Tickets.Commands.ChangeTicketEscalation;
 using POSShopTicketing.Application.Tickets.Commands.ChangeTicketPriority;
 using POSShopTicketing.Application.Tickets.Commands.ChangeTicketStatus;
+using POSShopTicketing.Application.Tickets.Commands.ChangeTicketTransportation;
 using POSShopTicketing.Application.Tickets.Commands.CreateTicket;
 using POSShopTicketing.Application.Tickets.Commands.Triage.AnonymizeTriageTicket;
 using POSShopTicketing.Application.Tickets.Commands.Triage.LinkTriageTicket;
@@ -236,6 +237,23 @@ public class TicketsController : ApiControllerBase
         await Mediator.Send(new RejectTriageTicketCommand(id, reason));
         return Ok(ApiResponse<object>.Success(new { }, "Ticket rejected."));
     }
+
+    [HttpPatch("{id:guid}/transportation")]
+    public async Task<ActionResult<ApiResponse<object>>> ChangeTransportation(
+    Guid id,
+    [FromBody] ChangeTransportationRequest request)
+    {
+        await Mediator.Send(
+            new ChangeTicketTransportationCommand(
+                id,
+                request.TransportationRoute,
+                request.TransportationAmount));
+
+        return Ok(
+            ApiResponse<object>.Success(
+                new { },
+                "Transportation details updated."));
+    }
 }
 
 public record ChangeStatusRequest(TicketStatus Status, string? Note = null);
@@ -244,3 +262,6 @@ public record TriageRegisterRequest(
     Guid? OrganizationId, string? NewOrganizationName,
     Guid? OrganizationTeamId, string? NewOrganizationTeamName,
     string MemberFullName);
+public record ChangeTransportationRequest(
+    string TransportationRoute,
+    string TransportationAmount);
