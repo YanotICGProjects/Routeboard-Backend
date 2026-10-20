@@ -8,6 +8,7 @@ using POSShopTicketing.Application.Tickets.Common;
 using POSShopTicketing.Domain.Entities;
 using POSShopTicketing.Domain.Enums;
 using POSShopTicketing.Domain.Exceptions;
+using FluentValidation;
 
 namespace POSShopTicketing.Infrastructure.Email;
 
@@ -61,11 +62,12 @@ public class TicketEmailService : ITicketEmailService
 
     public async Task<TicketEmailResult> SendAsync(TicketEmailRequest request, CancellationToken ct)
     {
+
         // ---- 1. Every email is tied to a ticket that ALREADY exists ----------------------------------
         var number = (request.TicketNumber ?? string.Empty).Trim().ToUpperInvariant();
         if (number.Length == 0)
         {
-            throw new DomainException("Every email must be tied to a ticket - messageTicketId is required.");
+            throw new DomainException("Every email must be tied to a ticket - messageTicketNumber is required.");
         }
 
         if (string.IsNullOrWhiteSpace(request.Html))
@@ -78,6 +80,8 @@ public class TicketEmailService : ITicketEmailService
         {
             throw new DomainException("toEmail must be a valid email address.");
         }
+
+
 
         // Tenant-filtered, so a ticket number from another workspace simply isn't found.
         var ticket = await _context.Tickets

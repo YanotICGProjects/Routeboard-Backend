@@ -45,7 +45,7 @@ public class SendEmailRequest
 
     /// <summary>The ticket this email is about, e.g. "POSSH-000078". REQUIRED. The ticket must already exist.</summary>
     [Required]
-    public string MessageTicketId { get; set; } = string.Empty;
+    public string MessageTicketNumber { get; set; } = string.Empty;
 
     /// <summary>
     /// A string, because the frontend sends "" when there is none (a Guid property cannot bind an empty string).

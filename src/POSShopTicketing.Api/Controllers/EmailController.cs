@@ -59,7 +59,7 @@ public class EmailController : ControllerBase
         try
         {
             var result = await _ticketEmail.SendAsync(new TicketEmailRequest(
-                TicketNumber: request.MessageTicketId,
+                TicketNumber: request.MessageTicketNumber,
                 Kind: kind,
                 ToEmail: request.ToEmail,
                 ToName: request.ToName,
@@ -78,7 +78,7 @@ public class EmailController : ControllerBase
             // Not the caller's fault: the email provider refused the message. (Rule violations - unknown ticket,
             // wrong recipient, bad sender - are NotFoundException / DomainException and are turned into
             // 404 / 400 by your ExceptionHandlingMiddleware.)
-            _logger.LogError(ex, "Resend refused the email for ticket {Ticket}", request.MessageTicketId);
+            _logger.LogError(ex, "Resend refused the email for ticket {Ticket}", request.MessageTicketNumber);
             return StatusCode(502, Fail("The email provider could not send the message.", ex.Message));
         }
     }
