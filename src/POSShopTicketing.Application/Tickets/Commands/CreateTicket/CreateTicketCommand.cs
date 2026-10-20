@@ -22,6 +22,8 @@ public record CreateTicketCommand : IRequest<Guid>
     public Guid? OrganizationContactId { get; init; }
     public bool Escalated { get; init; }
     public bool isSendToCustomer { get; init; }
+    public string TransportationRoute { get; set; } = string.Empty;
+    public string TransportationAmount { get; set; } = string.Empty;
     public TicketStatus Status { get; init; }
     public TicketPriority? Priority { get; init; }
 
@@ -111,6 +113,7 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
             Subject = request.Subject.Trim(),
             Status = request.Status,
             Escalated = request.Escalated,
+            isSendToCustomer = request.isSendToCustomer,
             Priority = priority,
             CreatorId = teamMember.Id,
             CreatorName = teamMember.FirstName + " " + teamMember.LastName,

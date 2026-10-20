@@ -812,6 +812,14 @@ namespace POSShopTicketing.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<string>("TransportationAmount")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TransportationRoute")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<bool>("isSendToCustomer")
                         .HasColumnType("boolean");
 

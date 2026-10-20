@@ -22,6 +22,8 @@ public class TicketDto
     public string? OrganizationContactFirstName { get; init; }
 
     public string? OrganizationContactLastName { get; init; }
+    public string TransportationRoute { get; init; } = string.Empty;
+    public string TransportationAmount { get; init; } = string.Empty;
     public Guid CreatorId { get; init; }
     public string? CreatorName { get; init; }
     public string RawSenderEmail { get; init; } = string.Empty;
@@ -55,6 +57,8 @@ public class TicketDto
         OrganizationContactId = entity.OrganizationContactId,
         OrganizationContactLastName = entity.OrganizationContact?.LastName,
         OrganizationContactFirstName = entity.OrganizationContact?.FirstName,
+        TransportationAmount = entity.TransportationAmount,
+        TransportationRoute = entity.TransportationRoute,
         CreatorId = entity.CreatorId,
         CreatorName = entity.CreatorName,
         RawSenderEmail = entity.RawSenderEmail,

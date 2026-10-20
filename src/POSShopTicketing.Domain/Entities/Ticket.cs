@@ -61,6 +61,8 @@ public class Ticket : BaseAuditableEntity, ITenantScoped
     public DateTime? FirstResponseAt { get; set; }
     public DateTime? ResolvedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
+    public string TransportationRoute { get; set; } = string.Empty;
+    public string TransportationAmount { get; set; } = string.Empty;
 
     /// <summary>Populated once SLA policies apply (see SlaPolicy) - null
     /// until then.</summary>
