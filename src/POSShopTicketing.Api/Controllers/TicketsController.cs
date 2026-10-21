@@ -56,10 +56,10 @@ public class TicketsController : ApiControllerBase
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20)
     {
-        if (_currentUserService.Role == TeamMemberRole.Agent)
-        {
-            assignedToTeamMemberId = _currentUserService.TeamMemberId;
-        }
+        //if (_currentUserService.Role == TeamMemberRole.Agent)
+        //{
+        //    assignedToTeamMemberId = _currentUserService.TeamMemberId;
+        //}
 
         var result = await Mediator.Send(new GetTicketsQuery
         {
