@@ -1,5 +1,7 @@
+using System.Net;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using POSShopTicketing.Application.Common.Interfaces;
 using POSShopTicketing.Application.Common.Models;
 using POSShopTicketing.Domain.Entities;
@@ -7,34 +9,57 @@ using POSShopTicketing.Domain.Enums;
 
 namespace POSShopTicketing.Application.Tickets.Events;
 
-public sealed class TicketCreatedEventHandler
-    : INotificationHandler<TicketCreatedEvent>
+/// <summary>
+/// REPLACES Application/Tickets/Events/TicketCreatedEventHandler.cs (the whole file).
+///
+/// Runs every time a ticket is created (by an agent in the app, or by a customer's email). It does three things,
+/// and none of them can break the request that created the ticket:
+///
+///   1. Team: in-app notification + email to the ticket's creator and assignee.
+///   2. Customer, ticket raised by the CUSTOMER'S EMAIL (Source = Email, known contact):
+///        an automatic no-reply "we received your email" notice. (Unknown senders get nothing: automatic replies to
+///        strangers can be abused to send mail to people who never wrote to you.)
+///   3. Customer, ticket CREATED BY AN AGENT (Source = Manual, contact with an email):
+///        - agent wrote a message for the customer -> a CONVERSATION email from the workspace support address. This
+///          STARTS the ticket's mail thread (the threadId is stored on the ticket). The message the agent typed was
+///          already saved when the ticket was created, so we send THAT message instead of saving a second copy.
+///        - agent wrote nothing for the customer   -> an automatic no-reply "ticket created" notice. The ticket has NO
+///          threadId yet; it gets one when an agent first emails the customer.
+///
+/// "Customer Email Sent" in-app notifications for the team are added by TicketEmailService itself.
+/// </summary>
+public sealed class TicketCreatedEventHandler : INotificationHandler<TicketCreatedEvent>
 {
     private readonly IAlertNotifier _alertNotifier;
     private readonly IApplicationDbContext _context;
     private readonly IEmailSender _emailSender;
     private readonly ITicketEmailService _ticketEmailService;
+    private readonly INotificationEmailService _notificationEmailService;
+    private readonly IHtmlSanitizerService _htmlSanitizer;
+    private readonly ILogger<TicketCreatedEventHandler> _logger;
 
     public TicketCreatedEventHandler(
         IAlertNotifier alertNotifier,
         IApplicationDbContext context,
         IEmailSender emailSender,
-        ITicketEmailService ticketEmailService)
+        ITicketEmailService ticketEmailService,
+        INotificationEmailService notificationEmailService,
+        IHtmlSanitizerService htmlSanitizer,
+        ILogger<TicketCreatedEventHandler> logger)
     {
         _alertNotifier = alertNotifier;
         _context = context;
         _emailSender = emailSender;
         _ticketEmailService = ticketEmailService;
+        _notificationEmailService = notificationEmailService;
+        _htmlSanitizer = htmlSanitizer;
+        _logger = logger;
     }
 
-    public async Task Handle(
-        TicketCreatedEvent notification,
-        CancellationToken cancellationToken)
+    public async Task Handle(TicketCreatedEvent notification, CancellationToken cancellationToken)
     {
-        //
-        // SYSTEM ALERT
-        //
-        await _alertNotifier.NotifyAsync(
+        // ---- System alert ----------------------------------------------------------------------------
+        await SafeAsync("system alert", () => _alertNotifier.NotifyAsync(
             new AlertMessage(
                 NotificationType.Other,
                 notification.IsUnverified
@@ -43,282 +68,220 @@ public sealed class TicketCreatedEventHandler
                 notification.Subject,
                 notification.TenantId,
                 notification.TicketId),
-            cancellationToken);
+            cancellationToken));
 
-        //
-        // LOAD TICKET
-        //
+        // ---- Load what we need -----------------------------------------------------------------------
         var ticket = await _context.Tickets
             .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.Id == notification.TicketId,
-                cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == notification.TicketId, cancellationToken);
 
-        if (ticket is null)
-        {
-            return;
-        }
+        if (ticket is null) return;
 
-        //
-        // LOAD TENANT
-        //
         var tenant = await _context.Tenants
             .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.Id == ticket.TenantId,
-                cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == ticket.TenantId, cancellationToken);
 
-        if (tenant is null)
-        {
-            return;
-        }
+        if (tenant is null) return;
 
-        //
-        // LOAD CREATOR
-        //
         var creator = await _context.TeamMembers
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.Id == ticket.CreatorId,
-                cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == ticket.CreatorId, cancellationToken);
 
-        //
-        // LOAD ASSIGNEE
-        //
         TeamMember? assignee = null;
-
         if (ticket.AssignedToTeamMemberId.HasValue)
         {
             assignee = await _context.TeamMembers
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    x => x.Id == ticket.AssignedToTeamMemberId.Value,
-                    cancellationToken);
+                .FirstOrDefaultAsync(x => x.Id == ticket.AssignedToTeamMemberId.Value, cancellationToken);
         }
 
-        //
-        // CREATOR NOTIFICATION
-        //
+        // ---- 1. TEAM: in-app notifications -----------------------------------------------------------
         if (creator is not null)
         {
-            _context.Notifications.Add(
-                new Notification
-                {
-                    TenantId = ticket.TenantId,
-                    TeamMemberId = creator.Id,
-                    TicketId = ticket.Id,
-                    Title = "Ticket Created",
-                    Message =
-                        $"Ticket {ticket.TicketNumber} has been created successfully.",
-                    IsRead = false,
-                    CreatedAt = DateTime.UtcNow
-                });
+            _context.Notifications.Add(NewNotification(
+                ticket, creator.Id, "Ticket Created",
+                $"Ticket {ticket.TicketNumber} has been created successfully."));
         }
 
-        //
-        // ASSIGNEE NOTIFICATION
-        //
-        if (assignee is not null
-            && assignee.Id != ticket.CreatorId)
+        if (assignee is not null && assignee.Id != ticket.CreatorId)
         {
-            _context.Notifications.Add(
-                new Notification
-                {
-                    TenantId = ticket.TenantId,
-                    TeamMemberId = assignee.Id,
-                    TicketId = ticket.Id,
-                    Title = "Ticket Assigned",
-                    Message =
-                        $"Ticket {ticket.TicketNumber} has been assigned to you.",
-                    IsRead = false,
-                    CreatedAt = DateTime.UtcNow
-                });
+            _context.Notifications.Add(NewNotification(
+                ticket, assignee.Id, "Ticket Assigned",
+                $"Ticket {ticket.TicketNumber} has been assigned to you."));
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await SafeAsync("team notifications", () => _context.SaveChangesAsync(cancellationToken));
 
-        //
-        // CREATOR EMAIL
-        //
-        if (creator is not null
-            && !string.IsNullOrWhiteSpace(creator.Email))
+        // ---- 1. TEAM: emails (values encoded, failures logged) ---------------------------------------
+        if (creator is not null && !string.IsNullOrWhiteSpace(creator.Email))
         {
-            await _emailSender.SendAsync(
-                creator.Email,
-                creator.FullName,
+            await SafeAsync("creator email", () => _emailSender.SendAsync(
+                creator.Email, creator.FullName,
                 $"Ticket {ticket.TicketNumber} Created",
-                $"""
-                <div style="font-family:Arial,sans-serif;">
-                    <h2>Ticket Created</h2>
-
-                    <p>Hello {creator.FullName},</p>
-
-                    <p>
-                        Ticket <strong>{ticket.TicketNumber}</strong>
-                        has been created successfully.
-                    </p>
-
-                    <p>
-                        <strong>Subject:</strong>
-                        {ticket.Subject}
-                    </p>
-
-                    <p>
-                        Current Status:
-                        <strong>{ticket.Status}</strong>
-                    </p>
-                </div>
-                """,
-                cancellationToken);
+                TeamEmail("Ticket Created", creator.FullName,
+                    $"Ticket <strong>{Enc(ticket.TicketNumber)}</strong> has been created successfully.",
+                    ticket),
+                cancellationToken));
         }
 
-        //
-        // ASSIGNEE EMAIL
-        //
-        if (assignee is not null
-            && !string.IsNullOrWhiteSpace(assignee.Email)
-            && assignee.Id != ticket.CreatorId)
+        if (assignee is not null && !string.IsNullOrWhiteSpace(assignee.Email) && assignee.Id != ticket.CreatorId)
         {
-            await _emailSender.SendAsync(
-                assignee.Email,
-                assignee.FullName,
+            await SafeAsync("assignee email", () => _emailSender.SendAsync(
+                assignee.Email, assignee.FullName,
                 $"Ticket {ticket.TicketNumber} Assigned",
-                $"""
-                <div style="font-family:Arial,sans-serif;">
-                    <h2>New Ticket Assignment</h2>
-
-                    <p>Hello {assignee.FullName},</p>
-
-                    <p>
-                        Ticket
-                        <strong>{ticket.TicketNumber}</strong>
-                        has been assigned to you.
-                    </p>
-
-                    <p>
-                        <strong>Subject:</strong>
-                        {ticket.Subject}
-                    </p>
-                </div>
-                """,
-                cancellationToken);
+                TeamEmail("New Ticket Assignment", assignee.FullName,
+                    $"Ticket <strong>{Enc(ticket.TicketNumber)}</strong> has been assigned to you.",
+                    ticket),
+                cancellationToken));
         }
 
-        //
-        // CUSTOMER EMAIL
-        //
-        if (!string.IsNullOrWhiteSpace(notification.CustomerEmailBody))
+        // ---- 2 + 3. CUSTOMER ---------------------------------------------------------------------------
+        await SafeAsync("customer email", () => SendCustomerEmailAsync(ticket, tenant, notification, cancellationToken));
+    }
+
+    // =====================================================================================================
+    //  CUSTOMER
+    // =====================================================================================================
+    private async Task SendCustomerEmailAsync(
+        Ticket ticket, Tenant tenant, TicketCreatedEvent notification, CancellationToken ct)
+    {
+        if (!ticket.OrganizationContactId.HasValue) return;   // unknown sender or no contact: nobody to write to
+
+        var contact = await _context.OrganizationContacts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == ticket.OrganizationContactId.Value, ct);
+
+        if (contact is null || string.IsNullOrWhiteSpace(contact.Email)) return;
+
+        // The customer's own email created this ticket -> "we received your email" (no-reply).
+        if (ticket.Source == TicketSource.Email)
         {
-            var contact = await _context.OrganizationContacts
-                .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    x => x.Id == ticket.OrganizationContactId,
-                    cancellationToken);
+            await _notificationEmailService.SendAutoReplyAsync(
+                contact.Email, contact.FullName, ticket.TicketNumber, ticket.Subject, ct);
+            return;
+        }
 
-            if (contact is not null &&
-                !string.IsNullOrWhiteSpace(contact.Email))
+        // An agent created the ticket and wrote nothing for the customer -> no-reply notice, NO thread yet.
+        if (string.IsNullOrWhiteSpace(notification.CustomerEmailBody))
+        {
+            await _notificationEmailService.SendTicketCreatedAsync(
+                contact.Email, contact.FullName, ticket.TicketNumber, ticket.Subject, ct);
+            return;
+        }
+
+        // An agent created the ticket AND wrote a message for the customer -> a conversation email from the workspace
+        // support address. It starts the thread and stores the threadId on the ticket.
+        // The message was already saved with the ticket (Outbound, no Message-ID yet): send that very message.
+        var initialMessageId = await _context.TicketMessages
+            .AsNoTracking()
+            .Where(m => m.TicketId == ticket.Id && m.Direction == MessageDirection.Outbound && m.MessageId == null)
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => (Guid?)m.Id)
+            .FirstOrDefaultAsync(ct);
+
+        try
+        {
+            await _ticketEmailService.SendAsync(new TicketEmailRequest(
+                TicketNumber: ticket.TicketNumber,
+                Kind: TicketEmailKind.Conversation,
+                ToEmail: contact.Email,
+                ToName: contact.FullName,
+                Subject: null,                    // the service uses the ticket's own subject
+                Html: CustomerHtml(tenant, contact, ticket, notification.CustomerEmailBody!),
+                ExistingTicketMessageId: initialMessageId), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "The first email to the customer on ticket {Ticket} could not be sent", ticket.TicketNumber);
+
+            // Let the person who created the ticket know, so it is not silently assumed to be sent.
+            if (ticket.CreatorId != Guid.Empty)
             {
-                var customerHtml =
-                    $"""
-                    <div style="background:#f4f7fa;padding:20px;font-family:Arial,sans-serif;">
-                    
-                        <div style="max-width:650px;margin:auto;background:#ffffff;border-radius:12px;padding:30px;">
-
-                            <h2 style="color:#009c9c;margin-bottom:10px;">
-                                {tenant.WorkSpaceName}
-                            </h2>
-
-                            <p>Hello {contact.FullName},</p>
-
-                            <p>
-                                We have received your request and created a support ticket.
-                            </p>
-
-                            <div style="background:#f8fafc;padding:15px;border-left:4px solid #009c9c;margin:20px 0;">
-                                
-                                <p>
-                                    <strong>Ticket Number:</strong>
-                                    {ticket.TicketNumber}
-                                </p>
-
-                                <p>
-                                    <strong>Subject:</strong>
-                                    {ticket.Subject}
-                                </p>
-
-                            </div>
-
-                            <div>
-                                {notification.CustomerEmailBody}
-                            </div>
-
-                            <br/>
-
-                            <p>
-                                Our support team will respond shortly.
-                            </p>
-
-                            <p>
-                                Regards,
-                                <br />
-                                {tenant.WorkSpaceName}
-                            </p>
-
-                        </div>
-
-                    </div>
-                    """;
-
-                await _ticketEmailService.SendAsync(
-                    new TicketEmailRequest(
-                        TicketNumber: ticket.TicketNumber,
-                        Kind: TicketEmailKind.Conversation,
-                        ToEmail: contact.Email,
-                        ToName: contact.FullName,
-                        Subject: $"[{ticket.TicketNumber}] {ticket.Subject}",
-                        Html: customerHtml,
-                        FromEmail: tenant.SupportEmail,
-                        FromName: tenant.WorkSpaceName,
-                        MailboxId: ticket.MailboxId),
-                    cancellationToken);
-
-                //
-                // CUSTOMER EMAIL NOTIFICATION
-                //
-                _context.Notifications.Add(
-                    new Notification
-                    {
-                        TenantId = ticket.TenantId,
-                        TeamMemberId = ticket.CreatorId,
-                        TicketId = ticket.Id,
-                        Title = "Customer Email Sent",
-                        Message =
-                            $"Email sent to {contact.Email} for ticket {ticket.TicketNumber}.",
-                        IsRead = false,
-                        CreatedAt = DateTime.UtcNow
-                    });
-
-                if (ticket.AssignedToTeamMemberId.HasValue &&
-                    ticket.AssignedToTeamMemberId.Value != ticket.CreatorId)
-                {
-                    _context.Notifications.Add(
-                        new Notification
-                        {
-                            TenantId = ticket.TenantId,
-                            TeamMemberId = ticket.AssignedToTeamMemberId.Value,
-                            TicketId = ticket.Id,
-                            Title = "Customer Email Sent",
-                            Message =
-                                $"Customer email sent for ticket {ticket.TicketNumber}.",
-                            IsRead = false,
-                            CreatedAt = DateTime.UtcNow
-                        });
-                }
-
-                await _context.SaveChangesAsync(cancellationToken);
+                _context.Notifications.Add(NewNotification(
+                    ticket, ticket.CreatorId, "Customer Email Failed",
+                    $"The email to {contact.Email} for ticket {ticket.TicketNumber} could not be sent. Open the ticket and send it again."));
+                await _context.SaveChangesAsync(ct);
             }
+        }
+    }
+
+    private string CustomerHtml(Tenant tenant, OrganizationContact contact, Ticket ticket, string agentBodyHtml)
+    {
+        var workspace = Enc(string.IsNullOrWhiteSpace(tenant.WorkSpaceName) ? tenant.Name : tenant.WorkSpaceName);
+
+        // The agent's text is the only untrusted HTML here: sanitize it, then wrap it in our own template.
+        var body = _htmlSanitizer.Sanitize(agentBodyHtml);
+
+        return $"""
+            <div style="background:#f4f7fa;padding:20px;font-family:Arial,sans-serif;">
+                <div style="max-width:650px;margin:auto;background:#ffffff;border-radius:12px;padding:30px;">
+
+                    <h2 style="color:#009c9c;margin-bottom:10px;">{workspace}</h2>
+
+                    <p>Hello {Enc(contact.FullName)},</p>
+
+                    <p>We have received your request and created a support ticket.</p>
+
+                    <div style="background:#f8fafc;padding:15px;border-left:4px solid #009c9c;margin:20px 0;">
+                        <p><strong>Ticket Number:</strong> {Enc(ticket.TicketNumber)}</p>
+                        <p><strong>Subject:</strong> {Enc(ticket.Subject)}</p>
+                    </div>
+
+                    <div>{body}</div>
+
+                    <br/>
+
+                    <p>Our support team will respond shortly.</p>
+
+                    <p>Regards,<br />{workspace}</p>
+                </div>
+            </div>
+            """;
+    }
+
+    // =====================================================================================================
+    //  HELPERS
+    // =====================================================================================================
+    private static Notification NewNotification(Ticket ticket, Guid teamMemberId, string title, string message) =>
+        new()
+        {
+            TenantId = ticket.TenantId,
+            TeamMemberId = teamMemberId,
+            TicketId = ticket.Id,
+            Title = title,
+            Message = message,
+            IsRead = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+    private static string TeamEmail(string heading, string? name, string lineHtml, Ticket ticket) => $"""
+        <div style="font-family:Arial,sans-serif;">
+            <h2>{Enc(heading)}</h2>
+            <p>Hello {Enc(name ?? string.Empty)},</p>
+            <p>{lineHtml}</p>
+            <p><strong>Subject:</strong> {Enc(ticket.Subject)}</p>
+            <p>Current Status: <strong>{Enc(ticket.Status.ToString())}</strong></p>
+        </div>
+        """;
+
+    private static string Enc(string value) => WebUtility.HtmlEncode(value);
+
+    /// <summary>Runs one side effect; a failure is logged and never stops the ticket creation that triggered it.</summary>
+    private async Task SafeAsync(string what, Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ticket created handler: {What} failed", what);
         }
     }
 }

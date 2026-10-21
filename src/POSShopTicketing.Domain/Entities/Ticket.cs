@@ -42,6 +42,7 @@ public class Ticket : BaseAuditableEntity, ITenantScoped
     /// Source = Email.</summary>
     public Guid? MailboxId { get; set; }
     public Mailbox? Mailbox { get; set; }
+    public string? ThreadId { get; set; }
 
     public string Subject { get; set; } = string.Empty;
 

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using POSShopTicketing.Api.Models.Email;
 using POSShopTicketing.Application.Common.Interfaces;
-using POSShopTicketing.Domain.Entities;
+using POSShopTicketing.Domain.Entities;           // TicketEmailKind (as in your current file)
 using POSShopTicketing.Infrastructure.Email;      // EmailSendException
 using POSShopTicketing.Shared.Wrappers;
 
@@ -12,15 +12,15 @@ namespace POSShopTicketing.Api.Controllers;
 /// <summary>
 /// REPLACES Controllers/EmailController.cs (the whole file).
 ///
-/// POST /api/email/send - the one endpoint that emails a customer about a ticket.
+///   POST /api/email/send
+///        The one endpoint that emails a customer about a ticket. It never creates a ticket.
+///          Notice        automatic no-reply message (never part of the thread)
+///          Conversation  an agent's message, from the workspace support address, in the ticket's one mail thread.
+///                        The first one on a ticket without a thread STARTS the thread; the response returns threadId.
 ///
-///   - messageTicketId is REQUIRED and the ticket must already exist. This endpoint never creates a ticket.
-///   - kind "Notice"       an automatic no-reply message           (from no-reply__{workspace}@support...)
-///   - kind "Conversation" an agent's message in the ticket thread (from the workspace address)
-///   - the response returns the mailbox that was used and the thread ids (see TicketEmailResult)
-///
-/// The old free-form test endpoints (send anything to anyone, /provider, /send-app) are removed on purpose:
-/// within the application every email must be tied to a ticket.
+///   GET  /api/email/thread/{ticketNumber}
+///        The ticket's threadId (null until the first message is emailed), the address the next conversation email
+///        comes from, and the subject it will carry - for the UI to show before the agent writes.
 /// </summary>
 [ApiController]
 [Route("api/email")]
@@ -39,18 +39,6 @@ public class EmailController : ControllerBase
     [HttpPost("send")]
     public async Task<IActionResult> Send([FromBody] SendEmailRequest request, CancellationToken ct)
     {
-        // "" (what the frontend sends when there is no mailbox) and a missing value both mean "no mailbox given".
-        Guid? mailboxId = null;
-        if (!string.IsNullOrWhiteSpace(request.MailboxId))
-        {
-            if (!Guid.TryParse(request.MailboxId, out var parsed))
-            {
-                return BadRequest(Fail("mailboxId must be a valid GUID, or empty."));
-            }
-
-            mailboxId = parsed;
-        }
-
         // Explicit "type" wins. Otherwise: a no-reply sender address means an automatic notice.
         var kind = request.Type ?? (LooksLikeNoReply(request.FromEmail)
             ? TicketEmailKind.Notice
@@ -67,7 +55,7 @@ public class EmailController : ControllerBase
                 Html: request.Html,
                 FromEmail: request.FromEmail,
                 FromName: request.FromName,
-                MailboxId: mailboxId), ct);
+                ThreadId: request.ThreadId), ct);
 
             return Ok(ApiResponse<TicketEmailResult>.Success(
                 result,
@@ -76,12 +64,19 @@ public class EmailController : ControllerBase
         catch (EmailSendException ex)
         {
             // Not the caller's fault: the email provider refused the message. (Rule violations - unknown ticket,
-            // wrong recipient, bad sender - are NotFoundException / DomainException and are turned into
+            // wrong recipient, bad sender or thread - are NotFoundException / DomainException and are turned into
             // 404 / 400 by your ExceptionHandlingMiddleware.)
             _logger.LogError(ex, "Resend refused the email for ticket {Ticket}", request.MessageTicketNumber);
             return StatusCode(502, Fail("The email provider could not send the message.", ex.Message));
         }
     }
+
+    //[HttpGet("thread/{ticketNumber}")]
+    //public async Task<IActionResult> GetThread(string ticketNumber, CancellationToken ct)
+    //{
+    //    var info = await _ticketEmail.GetThreadAsync(ticketNumber, ct);
+    //    return Ok(ApiResponse<TicketThreadInfo>.Success(info));
+    //}
 
     private static bool LooksLikeNoReply(string? fromEmail) =>
         !string.IsNullOrWhiteSpace(fromEmail) &&

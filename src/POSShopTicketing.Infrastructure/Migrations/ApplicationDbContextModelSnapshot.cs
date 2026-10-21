@@ -807,6 +807,10 @@ namespace POSShopTicketing.Infrastructure.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ThreadId")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("TicketNumber")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -843,6 +847,10 @@ namespace POSShopTicketing.Infrastructure.Migrations
                     b.HasIndex("TenantId", "AssignedToTeamMemberId");
 
                     b.HasIndex("TenantId", "Status");
+
+                    b.HasIndex("TenantId", "ThreadId")
+                        .IsUnique()
+                        .HasFilter("\"ThreadId\" IS NOT NULL");
 
                     b.ToTable("Tickets", (string)null);
                 });

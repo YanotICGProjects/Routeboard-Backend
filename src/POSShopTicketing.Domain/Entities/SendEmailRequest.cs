@@ -1,23 +1,26 @@
-﻿using POSShopTicketing.Domain.Entities;
-using System.ComponentModel.DataAnnotations;
-
+﻿using System.ComponentModel.DataAnnotations;
+using POSShopTicketing.Domain.Entities;   // wherever TicketEmailKind lives in your solution (as in your current file)
 
 namespace POSShopTicketing.Api.Models.Email;
 
 /// <summary>
 /// REPLACES Api/Models/Email/SendEmailRequest.cs. One payload shape for both kinds of email.
+/// "mailboxId" is gone: the identifier that matters is the THREAD ID, and the server already knows both the thread
+/// and the workspace support address from the ticket.
 ///
-/// 1. AUTOMATIC NOTICE (ticket created / assigned / closed ...):
+/// 1. AUTOMATIC NOTICE (ticket created / assigned / closed ...) - from the no-reply address, never in the thread:
 ///    { "toEmail": "...", "toName": "...", "subject": "...", "html": "...",
 ///      "fromEmail": "no-reply__pos-shop@support.routeboard.online", "fromName": "No Reply",
-///      "replyTo": "no-reply__pos-shop@support.routeboard.online", "messageTicketId": "POSSH-000078" }
+///      "messageTicketNumber": "POSSH-000078" }
 ///
-/// 2. CONVERSATION (an agent writing to the customer from the ticket):
-///    { "toEmail": "...", "toName": "...", "subject": "...", "html": "...",
-///      "fromEmail": "pos-shop@support.routeboard.online", "fromName": "POS Shop",
-///      "replyTo": "pos-shop@support.routeboard.online", "messageTicketId": "POSSH-000078", "mailboxId": "" }
-///    mailboxId is empty for a ticket created by hand whose first conversation this is; for a ticket the customer
-///    raised by email it is the mailbox the ticket arrived on.
+/// 2. FIRST CONVERSATION EMAIL on a ticket created by hand (the ticket has no thread yet) - from the workspace
+///    support address; it STARTS the thread and the response returns the new threadId:
+///    { "toEmail": "...", "toName": "...", "html": "...", "fromEmail": "pos-shop@support.routeboard.online",
+///      "fromName": "POS Shop", "messageTicketNumber": "POSSH-000078", "threadId": "" }
+///
+/// 3. LATER CONVERSATION EMAILS (and replies to a ticket the customer raised by email) - they continue the ticket's
+///    existing thread and never create a ticket:
+///    { ...as above..., "threadId": "the-ticket's-threadId" }
 /// </summary>
 public class SendEmailRequest
 {
@@ -48,10 +51,12 @@ public class SendEmailRequest
     public string MessageTicketNumber { get; set; } = string.Empty;
 
     /// <summary>
-    /// A string, because the frontend sends "" when there is none (a Guid property cannot bind an empty string).
-    /// Empty / missing is fine.
+    /// The ticket's mail thread. Empty / missing for the FIRST message to the customer on a ticket that has no thread
+    /// yet. If the ticket already has a thread, this must be that thread (or empty).
     /// </summary>
-    public string? MailboxId { get; set; }
+    [MaxLength(500)]
+    [RegularExpression(@"^[^\s<>]*$", ErrorMessage = "threadId must not contain spaces or angle brackets.")]
+    public string? ThreadId { get; set; }
 
     /// <summary>"Notice" or "Conversation". Optional: if missing it is worked out from fromEmail (no-reply... = Notice).</summary>
     public TicketEmailKind? Type { get; set; }

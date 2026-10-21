@@ -8,6 +8,7 @@ public class TicketDto
     public Guid Id { get; init; }
     public string TicketNumber { get; init; } = string.Empty;
     public string Subject { get; init; } = string.Empty;
+    public string? ThreadId { get; init; }
     public TicketStatus Status { get; init; }
     public TicketPriority Priority { get; init; }
     public TicketSource Source { get; init; }
@@ -50,6 +51,7 @@ public class TicketDto
         Escalated = entity.Escalated,
         isSendToCustomer = entity.isSendToCustomer,
         MailboxId = entity.MailboxId,
+        ThreadId = entity.ThreadId,
         OrganizationId = entity.OrganizationId,
         OrganizationName = entity.Organization?.Name,
         OrganizationDepartmentId = entity.OrganizationDepartmentId,
