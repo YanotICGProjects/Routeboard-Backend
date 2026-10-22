@@ -184,9 +184,17 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
         }
 
         var sanitizedBody = _htmlSanitizer.Sanitize(rawHtml);   // XSS protection
+        // ---- 5. Body: clean inbound email -------------------------------------
+
+        var cleanedBody = EmailBodyCleaner.ToCleanText(
+            request.BodyHtml,
+            request.BodyText,
+            _options.MaxBodyChars);
+
         var subject = string.IsNullOrWhiteSpace(request.Subject)
             ? "(no subject)"
             : Truncate(request.Subject.Trim(), MaxSubjectLength)!;
+
         var now = _dateTime.Now;
 
         // ---- 6. THE THREAD: does this email's threadId already belong to a ticket? ---------------
@@ -253,12 +261,12 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
             }
 
             ticket = contact is not null
-                ? await CreateTicketAsync(tenant, mailbox, threadId, subject, sanitizedBody, senderEmail, now,
+                ? await CreateTicketAsync(tenant, mailbox, threadId, subject, cleanedBody, senderEmail, now,
                     TicketStatus.New, contact.OrganizationId, contact.OrganizationDepartmentId, contact.Id,
                     runAssignment: true, ct)
                 // Unknown sender: never dropped - becomes an Unverified ticket,
                 // kept out of normal queues, assignment presets skipped.
-                : await CreateTicketAsync(tenant, mailbox, threadId, subject, sanitizedBody, senderEmail, now,
+                : await CreateTicketAsync(tenant, mailbox, threadId, subject, cleanedBody, senderEmail, now,
                     TicketStatus.Unverified, null, null, null,
                     runAssignment: false, ct);
         }
@@ -272,7 +280,7 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
             AuthorType = MessageAuthorType.OrganizationContact,
             AuthorEmail = senderEmail,
             AuthorName = senderName,
-            Body = sanitizedBody,
+            Body = cleanedBody,
             MessageId = messageId,
             InReplyToMessageId = string.IsNullOrWhiteSpace(request.InReplyTo)
                 ? null
@@ -444,11 +452,11 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
     }
 
     private async Task<Ticket> CreateTicketAsync(
-        Tenant tenant, Mailbox mailbox, string threadId, string subject, string sanitizedBody, string senderEmail,
+        Tenant tenant, Mailbox mailbox, string threadId, string subject, string cleanedBody, string senderEmail,
         DateTime now, TicketStatus status, Guid? organizationId, Guid? organizationDepartmentId,
         Guid? organizationContactId, bool runAssignment, CancellationToken ct)
     {
-        var priority = _priorityClassifier.Classify(subject, sanitizedBody);
+        var priority = _priorityClassifier.Classify(subject, cleanedBody);
         var dueAt = await _slaCalculator.CalculateDueDateAsync(tenant.Id, priority, now, ct);
 
         Guid? assignedTo = null;
