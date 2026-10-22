@@ -98,6 +98,13 @@ public static class EmailBodyCleaner
         s = ListItem.Replace(s, "- ");
         s = AnyTag.Replace(s, string.Empty);                      // every tag still left
 
+        // Remove broken tags without a closing >
+        s = Regex.Replace(
+            s,
+            @"<[a-zA-Z/][^\n\r>]*",
+            string.Empty,
+            RegexOptions.IgnoreCase);
+
         // Decode AFTER the tags are gone, so "&lt;gs1@x.com&gt;" becomes the visible text "<gs1@x.com>".
         s = WebUtility.HtmlDecode(s).Replace('\u00a0', ' ');
 
