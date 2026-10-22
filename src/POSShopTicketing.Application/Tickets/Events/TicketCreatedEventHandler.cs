@@ -15,7 +15,8 @@ namespace POSShopTicketing.Application.Tickets.Events;
 /// Runs every time a ticket is created (by an agent in the app, or by a customer's email). It does three things,
 /// and none of them can break the request that created the ticket:
 ///
-///   1. Team: in-app notification + email to the ticket's creator and assignee.
+///   1. Team: in-app notification + email to the ticket's CREATOR only (nothing if they assigned it to themselves).
+///      The assignee is told by TicketAssignedEventHandler ("assigned"), never "created".
 ///   2. Customer, ticket raised by the CUSTOMER'S EMAIL (Source = Email, known contact):
 ///        an automatic no-reply "we received your email" notice. (Unknown senders get nothing: automatic replies to
 ///        strangers can be abused to send mail to people who never wrote to you.)
@@ -88,53 +89,36 @@ public sealed class TicketCreatedEventHandler : INotificationHandler<TicketCreat
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == ticket.CreatorId, cancellationToken);
 
-        TeamMember? assignee = null;
-        if (ticket.AssignedToTeamMemberId.HasValue)
-        {
-            assignee = await _context.TeamMembers
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == ticket.AssignedToTeamMemberId.Value, cancellationToken);
-        }
+        // ---- 1. TEAM: only the CREATOR is told "ticket created" ---------------------------------------
+        //  - The ASSIGNEE is never told "ticket created" here. They get the "ticket assigned" notice from
+        //    TicketAssignedEventHandler, and nothing else (so they are not notified twice).
+        //  - If the creator assigned the ticket to THEMSELVES, they already know: no notice at all.
+        //  - The creator gets exactly ONE in-app notice and ONE email. Delete the in-app notice that
+        //    CreateTicketCommand also adds, otherwise the creator sees it twice.
+        var assignedToCreator = ticket.AssignedToTeamMemberId.HasValue
+                                && ticket.AssignedToTeamMemberId.Value == ticket.CreatorId;
+        var notifyCreator = creator is not null && !assignedToCreator;
 
-        // ---- 1. TEAM: in-app notifications -----------------------------------------------------------
-        if (creator is not null)
-        {
-            _context.Notifications.Add(NewNotification(
-                ticket, creator.Id, "Ticket Created",
-                $"Ticket {ticket.TicketNumber} has been created successfully."));
-        }
-
-        if (assignee is not null && assignee.Id != ticket.CreatorId)
+        if (notifyCreator)
         {
             _context.Notifications.Add(NewNotification(
-                ticket, assignee.Id, "Ticket Assigned",
-                $"Ticket {ticket.TicketNumber} has been assigned to you."));
-        }
+                ticket, creator!.Id, "Ticket Created",
+                ticket.AssignedToTeamMemberId.HasValue
+                    ? $"Ticket {ticket.TicketNumber} has been created successfully."
+                    : $"Ticket {ticket.TicketNumber} was created and is awaiting assignment."));
 
-        await SafeAsync("team notifications", () => _context.SaveChangesAsync(cancellationToken));
+            await SafeAsync("creator notification", () => _context.SaveChangesAsync(cancellationToken));
 
-        // ---- 1. TEAM: emails (values encoded, failures logged) ---------------------------------------
-        if (creator is not null && !string.IsNullOrWhiteSpace(creator.Email))
-        {
-            await SafeAsync("creator email", () => _emailSender.SendAsync(
-                creator.Email, creator.FullName,
-                $"Ticket {ticket.TicketNumber} Created",
-                TeamEmail("Ticket Created", creator.FullName,
-                    $"Ticket <strong>{Enc(ticket.TicketNumber)}</strong> has been created successfully.",
-                    ticket),
-                cancellationToken));
-        }
-
-        if (assignee is not null && !string.IsNullOrWhiteSpace(assignee.Email) && assignee.Id != ticket.CreatorId)
-        {
-            await SafeAsync("assignee email", () => _emailSender.SendAsync(
-                assignee.Email, assignee.FullName,
-                $"Ticket {ticket.TicketNumber} Assigned",
-                TeamEmail("New Ticket Assignment", assignee.FullName,
-                    $"Ticket <strong>{Enc(ticket.TicketNumber)}</strong> has been assigned to you.",
-                    ticket),
-                cancellationToken));
+            if (!string.IsNullOrWhiteSpace(creator.Email))
+            {
+                await SafeAsync("creator email", () => _emailSender.SendAsync(
+                    creator.Email, creator.FullName,
+                    $"Ticket {ticket.TicketNumber} Created",
+                    TeamEmail("Ticket Created", creator.FullName,
+                        $"Ticket <strong>{Enc(ticket.TicketNumber)}</strong> has been created successfully.",
+                        ticket),
+                    cancellationToken));
+            }
         }
 
         // ---- 2 + 3. CUSTOMER ---------------------------------------------------------------------------

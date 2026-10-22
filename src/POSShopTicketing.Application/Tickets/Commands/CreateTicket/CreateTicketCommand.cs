@@ -155,19 +155,19 @@ public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, G
         // Create an in-app notification only when the ticket is not assigned.
         // Assigned ticket notifications should be handled by the
         // TicketAssignedEventHandler.
-        if (!ticket.AssignedToTeamMemberId.HasValue)
-        {
-            _context.Notifications.Add(new Notification
-            {
-                TenantId = tenantId,
-                TeamMemberId = teamMember.Id,
-                TicketId = ticket.Id,
-                Title = "Ticket Created",
-                Message = $"Ticket {ticket.TicketNumber} was created and is awaiting assignment.",
-                IsRead = false,
-                CreatedAt = now
-            });
-        }
+        //if (!ticket.AssignedToTeamMemberId.HasValue)
+        //{
+        //    _context.Notifications.Add(new Notification
+        //    {
+        //        TenantId = tenantId,
+        //        TeamMemberId = teamMember.Id,
+        //        TicketId = ticket.Id,
+        //        Title = "Ticket Created",
+        //        Message = $"Ticket {ticket.TicketNumber} was created and is awaiting assignment.",
+        //        IsRead = false,
+        //        CreatedAt = now
+        //    });
+        //}
 
         await _context.SaveChangesAsync(cancellationToken);
 

@@ -16,6 +16,8 @@ public class InboundEmailOptions
 
     /// <summary>Spam / auto-reply-loop guard: new tickets one sender may open per hour per workspace.</summary>
     public int MaxNewTicketsPerSenderPerHour { get; set; } = 20;
+    /// <summary>Signs the Reply-To address of conversation emails. Any long random string.</summary>
+    public string ReplyTokenSecret { get; set; } = string.Empty;
 }
 
 public static class InboundEmailAddress

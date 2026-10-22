@@ -194,8 +194,13 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.Email == senderEmail, ct);
 
+        // 6a. STRONGEST SIGNAL: the customer replied to the signed reply address of one of our emails
+        //     (gs1+gs-000114.<signature>@...). It does not depend on any Message-ID, which the email provider rewrites.
+        var ticket = await FindTicketByReplyAddressAsync(tenantId, request.Recipients, ct);
+
+        // 6b. Otherwise the thread id decides: already known = a reply, new = a new ticket.
         var threadId = ResolveThreadId(request, messageId);
-        var ticket = await FindTicketByThreadAsync(tenantId, request, threadId, ct);
+        ticket ??= await FindTicketByThreadAsync(tenantId, request, threadId, ct);
 
         var events = new List<INotification>();
         bool isNewTicket;
@@ -345,15 +350,37 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
     private static string ResolveThreadId(IngestInboundEmailCommand request, string ownMessageId)
     {
         var firstReference = SplitIds(request.References).FirstOrDefault();
+        if (!string.IsNullOrEmpty(firstReference)) return firstReference;
 
-        var id = !string.IsNullOrEmpty(firstReference)
-            ? firstReference
-            : MessageIdHelper.Normalize(request.InReplyTo) is { Length: > 0 } inReplyTo
-                ? inReplyTo
-                : ownMessageId;
+        var inReplyTo = SplitIds(request.InReplyTo).FirstOrDefault();
+        return !string.IsNullOrEmpty(inReplyTo) ? inReplyTo : ownMessageId;
+    }
 
-        // Same input always gives the same result, so lookups still match.
-        return id.Length > 500 ? id[..500] : id;
+    /// <summary>
+    /// The signed reply address (see ReplyAddress). Valid signature = this email is for that ticket, full stop.
+    /// Returns null when no recipient carries a valid tag, or when InboundEmail:ReplyTokenSecret is not configured.
+    /// </summary>
+    private async Task<Ticket?> FindTicketByReplyAddressAsync(
+        Guid tenantId, IReadOnlyList<string> recipients, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_options.ReplyTokenSecret)) return null;
+
+        foreach (var recipient in recipients)
+        {
+            var address = InboundEmailAddress.Parse(recipient)?.Email;
+            if (address is null) continue;
+
+            var number = ReplyAddress.TryGetTicketNumber(address, tenantId, _options.ReplyTokenSecret);
+            if (number is null) continue;
+
+            var ticket = await _context.Tickets
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(t => t.TenantId == tenantId && t.TicketNumber == number, ct);
+
+            if (ticket is not null) return ticket;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -373,8 +400,10 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
         if (byThread is not null) return byThread;
 
         var ids = SplitIds(request.References);
-        var inReplyTo = MessageIdHelper.Normalize(request.InReplyTo);
-        if (inReplyTo.Length > 0 && !ids.Contains(inReplyTo)) ids.Add(inReplyTo);
+        foreach (var id in SplitIds(request.InReplyTo))
+        {
+            if (!ids.Contains(id)) ids.Add(id);
+        }
 
         if (ids.Count == 0) return null;
 
@@ -393,13 +422,9 @@ public class IngestInboundEmailCommandHandler : IRequestHandler<IngestInboundEma
         return byMessage;
     }
 
-    private static List<string> SplitIds(string? raw) =>
-        (raw ?? string.Empty)
-            .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(MessageIdHelper.Normalize)
-            .Where(id => id.Length > 0)
-            .Distinct()
-            .ToList();
+    /// <summary>Every id in a References / In-Reply-To value, whatever shape the provider delivered it in
+    /// ("&lt;a&gt; &lt;b&gt;", "&lt;a&gt;, &lt;b&gt;" or a JSON-looking list ["&lt;a&gt;","&lt;b&gt;"]).</summary>
+    private static List<string> SplitIds(string? raw) => MessageIdHelper.ExtractAll(raw);
 
     private async Task<IngestInboundEmailResult?> FindExistingMessageAsync(
         Guid tenantId, string messageId, CancellationToken ct)

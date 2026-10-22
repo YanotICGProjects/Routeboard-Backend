@@ -2,6 +2,7 @@
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using POSShopTicketing.Application.Common.Exceptions;
 using POSShopTicketing.Application.Common.Interfaces;
 using POSShopTicketing.Application.Tickets.Common;
@@ -42,6 +43,7 @@ public class TicketEmailService : ITicketEmailService
     private readonly IOutboundEmailSender _sender;
     private readonly IDateTime _dateTime;
     private readonly ILogger<TicketEmailService> _logger;
+    private readonly InboundEmailOptions _inbound;
 
     public TicketEmailService(
         IApplicationDbContext context,
@@ -50,6 +52,7 @@ public class TicketEmailService : ITicketEmailService
         IHtmlSanitizerService htmlSanitizer,
         IOutboundEmailSender sender,
         IDateTime dateTime,
+        IOptions<InboundEmailOptions> inboundOptions,
         ILogger<TicketEmailService> logger)
     {
         _context = context;
@@ -59,6 +62,7 @@ public class TicketEmailService : ITicketEmailService
         _sender = sender;
         _dateTime = dateTime;
         _logger = logger;
+        _inbound = inboundOptions.Value;
     }
 
     // =====================================================================================================
@@ -179,6 +183,11 @@ public class TicketEmailService : ITicketEmailService
         // subject would split the conversation in the customer's inbox.
         var subject = startsNewThread ? ticket.Subject.Trim() : ReplySubject(ticket.Subject);
 
+        // Reply-To: a SIGNED address (gs1+gs-000114.<signature>@...). Whatever the customer's mail app and the email
+        // provider do to the Message-IDs, the customer's reply goes to this address and finds its ticket again.
+        // (Without InboundEmail:ReplyTokenSecret this is just the plain workspace address.)
+        var replyAddress = ReplyAddress.Build(mailbox.EmailAddress, ticket.TicketNumber, ticket.TenantId, _inbound.ReplyTokenSecret);
+
         // ---- Save the agent's message FIRST, so it is never lost -------------------------------------
         TicketMessage message;
         var reusedExistingMessage = false;
@@ -229,7 +238,7 @@ public class TicketEmailService : ITicketEmailService
                 // A caller that passes ExistingTicketMessageId is our own trusted code (it has already sanitized the
                 // body and wrapped it in the email template); everything else is sanitized.
                 Html: reusedExistingMessage ? request.Html : message.Body,
-                ReplyTo: mailbox.EmailAddress,                    // ...and their answer comes back to it
+                ReplyTo: replyAddress,                            // ...and their answer comes back to THIS ticket
                 MessageId: messageId,
                 InReplyTo: inReplyTo,
                 References: references),
